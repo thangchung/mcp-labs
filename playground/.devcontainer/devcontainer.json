@@ -1,0 +1,32 @@
+{
+    "name": "AI Playground",
+    "image": "mcr.microsoft.com/devcontainers/dotnet:dev-9.0-bookworm",
+    "features": {
+        "ghcr.io/devcontainers/features/azure-cli:1": {},
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/powershell:1": {},
+        "ghcr.io/azure/azure-dev/azd:0": {}
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-dotnettools.csdevkit",
+                "ms-dotnettools.dotnet-interactive-vscode",
+				"ms-semantic-kernel.semantic-kernel",
+				"esbenp.prettier-vscode",
+                "GitHub.copilot-chat",
+                "GitHub.copilot"
+            ],
+            "settings": {
+                "remote.autoForwardPorts": true,
+                "remote.autoForwardPortsSource": "hybrid",
+                "remote.otherPortsAttributes": {
+                    "onAutoForward": "ignore"
+                }
+            }
+        }
+    },
+    "onCreateCommand": "dotnet new install Aspire.ProjectTemplates::*-*",
+    "postStartCommand": "dotnet dev-certs https --trust",
+    "forwardPorts": []
+}
