@@ -1,0 +1,9 @@
+# For more info on HTTP files go to https://aka.ms/vs/httpfile
+
+POST http://localhost:3002/AgentAvailableAsMCPToolSample
+Content-Type: application/json
+
+{
+}
+
+###

@@ -1,31 +1,67 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System.Threading.Tasks;
 using MCPClient.Samples;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
-namespace MCPClient;
+var builder = WebApplication.CreateBuilder(args);
 
-internal sealed class Program
+builder.Services.AddOpenTelemetry()
+    .WithTracing(b => b.AddSource("*")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation())
+    .WithMetrics(b => b.AddMeter("*")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation())
+    .WithLogging()
+    .UseOtlpExporter();
+
+var app = builder.Build();
+
+app.MapPost("/AgentAvailableAsMCPToolSample", async () =>
 {
-    /// <summary>
-    /// Main method to run all the samples.
-    /// </summary>
-    public static async Task Main(string[] args)
-    {
-        //await MCPToolsSample.RunAsync();
+    await AgentAvailableAsMCPToolSample.RunAsync();
 
-        //await MCPPromptSample.RunAsync();
+    return Results.Accepted();
+});
 
-        //await MCPResourcesSample.RunAsync();
+app.MapPost("/MCPToolsSample", async () =>
+{
+    await MCPToolsSample.RunAsync();
 
-        //await MCPResourceTemplatesSample.RunAsync();
+    return Results.Accepted();
+});
 
-        //await MCPSamplingSample.RunAsync(); // not working, cannot inject IMcpServer when sampling
+app.MapPost("/", async () =>
+{
 
-        //await ChatCompletionAgentWithMCPToolsSample.RunAsync();
+    return Results.Accepted();
+});
 
-        //await AzureAIAgentWithMCPToolsSample.RunAsync(); // not working
+app.Run();
 
-        await AgentAvailableAsMCPToolSample.RunAsync();
-    }
-}
+//internal sealed class Program
+//{
+//    /// <summary>
+//    /// Main method to run all the samples.
+//    /// </summary>
+//    public static async Task Main(string[] args)
+//    {
+//        //await MCPToolsSample.RunAsync();
+
+//        //await MCPPromptSample.RunAsync();
+
+//        //await MCPResourcesSample.RunAsync();
+
+//        //await MCPResourceTemplatesSample.RunAsync();
+
+//        //await MCPSamplingSample.RunAsync(); // not working, cannot inject IMcpServer when sampling
+
+//        //await ChatCompletionAgentWithMCPToolsSample.RunAsync();
+
+//        //await AzureAIAgentWithMCPToolsSample.RunAsync(); // not working
+
+//        await AgentAvailableAsMCPToolSample.RunAsync();
+//    }
+//}

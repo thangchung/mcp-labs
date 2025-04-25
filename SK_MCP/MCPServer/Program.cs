@@ -13,6 +13,9 @@ using Microsoft.SemanticKernel.Connectors.InMemory;
 using Microsoft.SemanticKernel.Embeddings;
 using ModelContextProtocol.Protocol.Types;
 using ModelContextProtocol.Server;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +58,16 @@ builder.Services
         name: "cat-image",
         content: EmbeddedResource.ReadAsBytes("cat.jpg"),
         mimeType: "image/jpeg"));
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(b => b.AddSource("*")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation())
+    .WithMetrics(b => b.AddMeter("*")
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation())
+    .WithLogging()
+    .UseOtlpExporter();
 
 var app = builder.Build();
 
