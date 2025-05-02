@@ -1,0 +1,17 @@
+﻿# For more info on HTTP files go to https://aka.ms/vs/httpfile
+
+POST http://localhost:5551/zeroshot
+Content-Type: application/json
+
+{
+}
+
+###
+
+POST http://localhost:5551/oneshot-fewshot
+Content-Type: application/json
+
+{
+}
+
+###
