@@ -1,5 +1,8 @@
 ﻿@page "/"
 @using System.ComponentModel
+@using Microsoft.SemanticKernel.ChatCompletion
+@using ModelContextProtocol.Client
+@using ModelContextProtocol.Protocol.Transport
 @inject IChatClient ChatClient
 @inject NavigationManager Nav
 @inject SemanticSearch Search
@@ -18,7 +21,7 @@
 </ChatMessageList>
 
 <div class="chat-container">
-    <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions" />
+    @* <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions" /> *@
     <ChatInput OnSend="@AddUserMessageAsync" @ref="@chatInput" />
     <SurveyPrompt /> @* Remove this line to eliminate the template survey message *@
 </div>
@@ -26,18 +29,8 @@
 @code {
     private const string SystemPrompt = @"
         You are an assistant who answers questions about information you retrieve.
-        Do not answer questions about anything else.
-        Use only simple markdown to format your responses.
 
-        Use the search tool to find relevant information. When you do this, end your
-        reply with citations in the special XML format:
-
-        <citation filename='string' page_number='number'>exact quote here</citation>
-
-        Always include the citation in your response if there are results.
-
-        The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
-        Don't refer to the presence of citations; just emit these tags right at the end, with no surrounding text.
+        Use tools you have to find relevant information.
         ";
 
     private readonly ChatOptions chatOptions = new();
@@ -46,37 +39,56 @@
     private ChatMessage? currentResponseMessage;
     private ChatInput? chatInput;
     private ChatSuggestions? chatSuggestions;
+    private IMcpClient? McpClient;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        McpClient = await McpClientFactory.CreateAsync(
+            // clientTransport: new StdioClientTransport(new()
+            //     {
+            //         Command = @"..\..\..\..\ChatApp.SampleMCPServer\bin\Debug\net9.0\ChatApp.SampleMCPServer.exe",
+            //         Name = "MCPServer",
+            //     }));
+            clientTransport: new SseClientTransport(new SseClientTransportOptions()
+            {
+                Endpoint = new Uri("http://localhost:5066/sse"),
+            }));
+
+        var tools = await McpClient.ListToolsAsync();
+
+        chatOptions.Tools = [.. tools];
+
         messages.Add(new(ChatRole.System, SystemPrompt));
-        chatOptions.Tools = [AIFunctionFactory.Create(SearchAsync)];
+
+        await base.OnInitializedAsync();
     }
 
-    private async Task AddUserMessageAsync(ChatMessage userMessage)
-    {
-        CancelAnyCurrentResponse();
-
-        // Add the user message to the conversation
-        messages.Add(userMessage);
-        chatSuggestions?.Clear();
-        await chatInput!.FocusAsync();
-
-        // Stream and display a new response from the IChatClient
-        var responseText = new TextContent("");
-        currentResponseMessage = new ChatMessage(ChatRole.Assistant, [responseText]);
-        currentResponseCancellation = new();
-        await foreach (var update in ChatClient.GetStreamingResponseAsync([.. messages], chatOptions, currentResponseCancellation.Token))
+    @code {
+        private async Task AddUserMessageAsync(ChatMessage userMessage)
         {
-            messages.AddMessages(update, filter: c => c is not TextContent);
-            responseText.Text += update.Text;
-            ChatMessageItem.NotifyChanged(currentResponseMessage);
-        }
+            CancelAnyCurrentResponse();
 
-        // Store the final response in the conversation, and begin getting suggestions
-        messages.Add(currentResponseMessage!);
-        currentResponseMessage = null;
-        chatSuggestions?.Update(messages);
+            // Add the user message to the conversation
+            messages.Add(userMessage);
+            chatSuggestions?.Clear();
+            await chatInput!.FocusAsync();
+
+            // Stream and display a new response from the IChatClient
+            var responseText = new Microsoft.Extensions.AI.TextContent(""); // Specify the namespace explicitly
+            currentResponseMessage = new ChatMessage(ChatRole.Assistant, [responseText]);
+            currentResponseCancellation = new();
+            await foreach (var update in ChatClient.GetStreamingResponseAsync([.. messages], chatOptions, currentResponseCancellation.Token))
+            {
+                messages.AddMessages(update, filter: c => c is not Microsoft.Extensions.AI.TextContent); // Specify the namespace explicitly
+                responseText.Text += update.Text;
+                ChatMessageItem.NotifyChanged(currentResponseMessage);
+            }
+
+            // Store the final response in the conversation, and begin getting suggestions
+            messages.Add(currentResponseMessage!);
+            currentResponseMessage = null;
+            chatSuggestions?.Update(messages);
+        }
     }
 
     private void CancelAnyCurrentResponse()
@@ -112,5 +124,8 @@
     }
 
     public void Dispose()
-        => currentResponseCancellation?.Cancel();
+    {
+        McpClient?.DisposeAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+        currentResponseCancellation?.Cancel();
+    }
 }

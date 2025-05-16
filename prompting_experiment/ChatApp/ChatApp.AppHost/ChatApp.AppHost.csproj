@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ChatApp.SampleMCPServer\ChatApp.SampleMCPServer.csproj" />
     <ProjectReference Include="..\ChatApp.Web\ChatApp.Web.csproj" />
   </ItemGroup>
 

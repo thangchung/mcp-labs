@@ -1,9 +1,8 @@
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.VectorData;
 using ChatApp.Web.Components;
 using ChatApp.Web.Services;
 using ChatApp.Web.Services.Ingestion;
-using OpenAI;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Connectors.Qdrant;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +10,7 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
 var openai = builder.AddAzureOpenAIClient("openai");
+
 openai.AddChatClient("gpt-4o-mini")
     .UseFunctionInvocation()
     .UseOpenTelemetry(configure: c =>
@@ -48,8 +48,8 @@ app.MapRazorComponents<App>()
 // other sources by implementing IIngestionSource.
 // Important: ensure that any content you ingest is trusted, as it may be reflected back
 // to users or could be a source of prompt injection risk.
-await DataIngestor.IngestDataAsync(
-    app.Services,
-    new PDFDirectorySource(Path.Combine(builder.Environment.WebRootPath, "Data")));
+//await DataIngestor.IngestDataAsync(
+//    app.Services,
+//    new PDFDirectorySource(Path.Combine(builder.Environment.WebRootPath, "Data")));
 
 app.Run();

@@ -1,14 +1,16 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>7b6ad51b-2e7f-4081-a571-95854e2d719b</UserSecretsId>
+    <NoWarn>$(NoWarn);VSTHRD111;CA2007;CA1054;SKEXP0001;SKEXP0010;SKEXP0110</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.AI.OpenAI" Version="9.2.1-preview.1.25222.1" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="9.4.3-preview.1.25230.7" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.4.3-preview.1.25230.7" />
     <PackageReference Include="CommunityToolkit.Aspire.Microsoft.EntityFrameworkCore.Sqlite" Version="9.4.1-beta.277" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="9.4.3-preview.1.25230.7" />
@@ -17,6 +19,22 @@
     <PackageReference Include="System.Linq.Async" Version="6.0.1" />
     <PackageReference Include="Aspire.Qdrant.Client" Version="9.2.1" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant" Version="1.47.0-preview" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Core Semantic Kernel packages -->
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.47.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Abstractions" Version="1.47.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.47.0" />
+    <!-- Connectors -->
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI " Version="1.47.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.47.0-preview" />
+    <!-- Prompting -->
+    <PackageReference Include="Microsoft.SemanticKernel.PromptTemplates.Handlebars" Version="1.47.0" />
+    <!-- Agent -->
+    <PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.47.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Agents.AzureAI" Version="1.47.0-preview" />
+    <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.11" />
   </ItemGroup>
 
   <ItemGroup>
