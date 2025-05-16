@@ -32,7 +32,9 @@ kernelBuilder.Plugins.AddFromFunctions("Agents", [AgentKernelFunctionFactory.Cre
 
 // Register MCP server
 builder.Services
-    .AddMcpServer().WithHttpTransport().WithSKPlugins();
+    .AddMcpServer()
+    .WithHttpTransport()
+    .WithSKPlugins();
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(b => b.AddSource("*")
