@@ -8,13 +8,10 @@
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/dapr/cli/dapr-cli:0": {}
 	},
-
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "bash .devcontainer/post-create.sh",
-
 	// Configure tool-specific properties.
 	"customizations": {
 		"vscode": {
@@ -22,11 +19,17 @@
 				"ms-python.python",
 				"ms-toolsai.jupyter",
 				"GitHub.copilot-chat",
-                "GitHub.copilot"
-			]
+				"GitHub.copilot"
+			],
+			"settings": {
+				"remote.autoForwardPorts": true,
+				"remote.autoForwardPortsSource": "hybrid",
+				"remote.otherPortsAttributes": {
+					"onAutoForward": "ignore"
+				}
+			}
 		}
 	}
-
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
 }

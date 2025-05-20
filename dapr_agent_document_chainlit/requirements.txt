@@ -1,0 +1,5 @@
+dapr-agents>=0.5.1
+python-dotenv
+requests
+chainlit
+unstructured[all-docs]
