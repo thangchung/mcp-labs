@@ -1,8 +1,10 @@
 ﻿@page "/"
 @using System.ComponentModel
 @using Microsoft.SemanticKernel.ChatCompletion
+@using ModelContextProtocol
 @using ModelContextProtocol.Client
 @using ModelContextProtocol.Protocol.Transport
+@using ModelContextProtocol.Protocol.Types
 @inject IChatClient ChatClient
 @inject NavigationManager Nav
 @inject SemanticSearch Search
@@ -52,7 +54,18 @@
             clientTransport: new SseClientTransport(new SseClientTransportOptions()
             {
                 Endpoint = new Uri("http://localhost:5066/sse"),
-            }));
+            }),
+            clientOptions: new McpClientOptions()
+            {
+                Capabilities = new ClientCapabilities
+                {
+                    Sampling = new SamplingCapability
+                    {
+                        SamplingHandler = InvokeHandlerAsync
+                    },
+                },
+            }
+        );
 
         var tools = await McpClient.ListToolsAsync();
 
@@ -127,5 +140,26 @@
     {
         McpClient?.DisposeAsync().ConfigureAwait(false).GetAwaiter().GetResult();
         currentResponseCancellation?.Cancel();
+    }
+
+    private async ValueTask<CreateMessageResult> InvokeHandlerAsync(CreateMessageRequestParams? request, IProgress<ProgressNotificationValue> progress, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        var concatContent = request.Messages.Aggregate(" ", (x, y) => x + y.Content.Text);
+        var convertMsg = new ChatMessage(ChatRole.Assistant, concatContent);
+
+        var result = await ChatClient.GetResponseAsync([convertMsg], chatOptions, cancellationToken: cancellationToken);
+
+        return new CreateMessageResult
+        {
+            Content = new Content { Text = result.Text },
+            Model = "test-model",
+            Role = Role.User,
+            StopReason = "endTurn"
+        };
     }
 }

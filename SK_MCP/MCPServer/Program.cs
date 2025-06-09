@@ -10,8 +10,7 @@ using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Connectors.InMemory;
-using Microsoft.SemanticKernel.Embeddings;
-using ModelContextProtocol.Protocol.Types;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -34,8 +33,8 @@ kernelBuilder.Plugins.AddFromType<MailboxUtils>();
 kernelBuilder.Plugins.AddFromFunctions("Agents", [AgentKernelFunctionFactory.CreateFromAgent(CreateSalesAssistantAgent(chatModelId, endpoint, apiKey))]);
 
 // Register embedding generation service and in-memory vector store
-kernelBuilder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>();
-kernelBuilder.AddAzureOpenAITextEmbeddingGeneration(embeddingModelId, endpoint, apiKey);
+kernelBuilder.Services.AddSingleton<VectorStore, InMemoryVectorStore>();
+kernelBuilder.Services.AddOpenAIEmbeddingGenerator(embeddingModelId, apiKey);
 
 // Register MCP server
 builder.Services
@@ -86,23 +85,23 @@ static (string EmbeddingModelId, string ChatModelId, string endpoint, string Api
         .AddEnvironmentVariables()
         .Build();
 
-    if (config["AzureOpenAI:ApiKey"] is not { } apiKey)
+    if (config["ConnectionStrings:apiKey"] is not { } apiKey)
     {
-        const string Message = "Please provide a valid AzureOpenAI:ApiKey to run this sample. See the associated README.md for more details.";
+        const string Message = "Please provide a valid ConnectionStrings:apiKey to run this sample. See the associated README.md for more details.";
         Console.Error.WriteLine(Message);
         throw new InvalidOperationException(Message);
     }
 
-    if (config["AzureOpenAI:Endpoint"] is not { } endpoint)
+    if (config["ConnectionStrings:endpoint"] is not { } endpoint)
     {
-        const string Message = "Please provide a valid AzureOpenAI:Endpoint to run this sample. See the associated README.md for more details.";
+        const string Message = "Please provide a valid ConnectionStrings:endpoint to run this sample. See the associated README.md for more details.";
         Console.Error.WriteLine(Message);
         throw new InvalidOperationException(Message);
     }
 
-    string embeddingModelId = config["AzureOpenAI:EmbeddingModelId"] ?? "text-embedding-3-small";
+    string embeddingModelId = config["ConnectionStrings:embeddingModelId"] ?? "text-embedding-3-small";
 
-    string chatModelId = config["AzureOpenAI:ChatModelId"] ?? "gpt-4o-mini";
+    string chatModelId = config["ConnectionStrings:chatModelId"] ?? "gpt-4o-mini";
 
     return (embeddingModelId, chatModelId, endpoint, apiKey);
 }
@@ -121,12 +120,12 @@ static ResourceTemplateDefinition CreateVectorStoreSearchResourceTemplate(Kernel
             RequestContext<ReadResourceRequestParams> context,
             string collection,
             string prompt,
-            [FromKernelServices] ITextEmbeddingGenerationService embeddingGenerationService,
-            [FromKernelServices] IVectorStore vectorStore,
+            [FromKernelServices] IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+            [FromKernelServices] VectorStore vectorStore,
             CancellationToken cancellationToken) =>
         {
             // Get the vector store collection
-            IVectorStoreRecordCollection<Guid, TextDataModel> vsCollection = vectorStore.GetCollection<Guid, TextDataModel>(collection);
+            VectorStoreCollection<Guid, TextDataModel> vsCollection = vectorStore.GetCollection<Guid, TextDataModel>(collection);
 
             // Check if the collection exists, if not create and populate it
             if (!await vsCollection.CollectionExistsAsync(cancellationToken))
@@ -144,19 +143,19 @@ static ResourceTemplateDefinition CreateVectorStoreSearchResourceTemplate(Kernel
                 string content = EmbeddedResource.ReadAsString("semantic-kernel-info.txt");
 
                 // Create a collection from the lines in the file
-                await vectorStore.CreateCollectionFromListAsync<Guid, TextDataModel>(collection, content.Split('\n'), embeddingGenerationService, CreateRecord);
+                await vectorStore.CreateCollectionFromListAsync<Guid, TextDataModel>(collection, content.Split('\n'), embeddingGenerator, CreateRecord);
             }
 
             // Generate embedding for the prompt
-            ReadOnlyMemory<float> promptEmbedding = await embeddingGenerationService.GenerateEmbeddingAsync(prompt, cancellationToken: cancellationToken);
+            ReadOnlyMemory<float> promptEmbedding = (await embeddingGenerator.GenerateAsync(prompt, cancellationToken: cancellationToken)).Vector;
 
             // Retrieve top three matching records from the vector store
-            VectorSearchResults<TextDataModel> result = await vsCollection.VectorizedSearchAsync(promptEmbedding, new() { Top = 3 }, cancellationToken);
+            var result = vsCollection.SearchAsync(promptEmbedding, top: 3, cancellationToken: cancellationToken);
 
             // Return the records as resource contents
             List<ResourceContents> contents = [];
 
-            await foreach (var record in result.Results)
+            await foreach (var record in result)
             {
                 contents.Add(new TextResourceContents()
                 {

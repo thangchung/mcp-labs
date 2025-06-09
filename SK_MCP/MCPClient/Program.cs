@@ -33,6 +33,12 @@ app.MapPost("/MCPToolsSample", async () =>
     return Results.Accepted();
 });
 
+app.MapPost("/MCPSamplingSample", async () =>
+{
+    await MCPSamplingSample.RunAsync();
+    return Results.Accepted();
+});
+
 app.MapPost("/", async () =>
 {
 
