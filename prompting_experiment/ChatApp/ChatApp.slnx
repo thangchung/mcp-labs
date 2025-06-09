@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Project Path="ChatApp.AppHost/ChatApp.AppHost.csproj" />
+  <Project Path="ChatApp.SampleMCPServer/ChatApp.SampleMCPServer.csproj" />
+  <Project Path="ChatApp.ServiceDefaults/ChatApp.ServiceDefaults.csproj" />
+  <Project Path="ChatApp.Web/ChatApp.Web.csproj" />
+</Solution>
