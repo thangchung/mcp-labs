@@ -87,7 +87,7 @@ internal sealed class AzureAIAgentWithMCPToolsSample : BaseSample
 
         if (config["AzureAI:Endpoint"] is not { } endpoint)
         {
-            const string Message = "Please provide a valid `AzureAI:ConnectionString` secret to run this sample. See the associated README.md for more details.";
+            const string Message = "Please provide a valid `AzureAI:Endpoint` secret to run this sample. See the associated README.md for more details.";
             Console.Error.WriteLine(Message);
             throw new InvalidOperationException(Message);
         }

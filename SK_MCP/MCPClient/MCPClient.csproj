@@ -20,7 +20,7 @@
     <PackageReference Include="Microsoft.SemanticKernel.Abstractions" />
     <PackageReference Include="Microsoft.SemanticKernel.Core" />
     <!-- Connectors -->
-    <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI " />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.InMemory" />
     <!-- Prompting -->
     <PackageReference Include="Microsoft.SemanticKernel.PromptTemplates.Handlebars" />
