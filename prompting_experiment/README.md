@@ -1,4 +1,14 @@
-﻿# References
+﻿# Get starting with aichatweb
+
+```sh
+dotnet new install Microsoft.Extensions.AI.Templates
+```
+
+```sh
+dotnet new aichatweb --provider azureopenai --vector-store qdrant --managed-identity false --aspire true -C gpt-4o-mini -E text-embedding-3-small 
+```
+
+## References
 
 This is all references to the project.
 
