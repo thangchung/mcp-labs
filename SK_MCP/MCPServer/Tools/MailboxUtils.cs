@@ -1,9 +1,8 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using MCPServer.ProjectResources;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.SemanticKernel;
-using ModelContextProtocol.Protocol.Types;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace MCPServer.Tools;
@@ -18,7 +17,7 @@ internal sealed class MailboxUtils
     /// mechanism for summarization.
     /// </summary>
     [KernelFunction]
-    public static async Task<string> SummarizeUnreadEmailsAsync([FromServices] IMcpServer server)
+    public static async Task<string> SummarizeUnreadEmailsAsync([FromKernelServices] IMcpServer server)
     {
         if (server.ClientCapabilities?.Sampling is null)
         {
@@ -53,7 +52,7 @@ internal sealed class MailboxUtils
         };
 
         // Send the sampling request to the client to summarize the emails
-        CreateMessageResult result = await server.RequestSamplingAsync(request, cancellationToken: CancellationToken.None);
+        CreateMessageResult result = await server.SampleAsync(request, cancellationToken: CancellationToken.None);
 
         // Assuming the response is a text message
         return result.Content.Text!;

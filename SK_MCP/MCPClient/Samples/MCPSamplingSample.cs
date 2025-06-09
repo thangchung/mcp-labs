@@ -1,16 +1,11 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol.Types;
+using ModelContextProtocol.Protocol;
 
 namespace MCPClient.Samples;
 
@@ -61,7 +56,7 @@ internal sealed class MCPSamplingSample : BaseSample
         };
 
         // Execute a prompt
-        string prompt = "Create a schedule for me based on the latest unread emails in my inbox. And if anyone have a birthday in May, then show me his/her name.";
+        string prompt = "Create a schedule for me based on the latest unread emails in my inbox.";
         IChatCompletionService chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent result = await chatCompletion.GetChatMessageContentAsync(prompt, executionSettings, kernel);
 

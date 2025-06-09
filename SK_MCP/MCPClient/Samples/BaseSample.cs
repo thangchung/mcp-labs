@@ -1,16 +1,9 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol.Transport;
-using ModelContextProtocol.Protocol.Types;
+using ModelContextProtocol.Protocol;
 
 namespace MCPClient.Samples;
 
@@ -91,21 +84,21 @@ internal abstract class BaseSample
             .AddEnvironmentVariables()
             .Build();
 
-        if (config["AzureOpenAI:ApiKey"] is not { } apiKey)
+        if (config["ConnectionStrings:apiKey"] is not { } apiKey)
         {
-            const string Message = "Please provide a valid AzureOpenAI:ApiKey to run this sample. See the associated README.md for more details.";
+            const string Message = "Please provide a valid ConnectionStrings:apiKey to run this sample. See the associated README.md for more details.";
             Console.Error.WriteLine(Message);
             throw new InvalidOperationException(Message);
         }
 
-        if (config["AzureOpenAI:Endpoint"] is not { } endpoint)
+        if (config["ConnectionStrings:endpoint"] is not { } endpoint)
         {
-            const string Message = "Please provide a valid AzureOpenAI:Endpoint to run this sample. See the associated README.md for more details.";
+            const string Message = "Please provide a valid ConnectionStrings:endpoint to run this sample. See the associated README.md for more details.";
             Console.Error.WriteLine(Message);
             throw new InvalidOperationException(Message);
         }
 
-        string modelId = config["AzureOpenAI:ChatModelId"] ?? "gpt-4o-mini";
+        string modelId = config["ConnectionStrings:chatModelId"] ?? "gpt-4o-mini";
 
         // Create kernel
         var kernelBuilder = Kernel.CreateBuilder();

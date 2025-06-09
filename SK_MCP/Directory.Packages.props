@@ -1,0 +1,33 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.3.0" />
+    <PackageVersion Include="Azure.AI.Projects" Version="1.0.0-beta.9" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="9.0.5" />
+    <PackageVersion Include="Microsoft.SemanticKernel" Version="1.55.0" />
+    <PackageVersion Include="Microsoft.SemanticKernel.Abstractions" Version="1.55.0" />
+    <PackageVersion Include="Microsoft.SemanticKernel.Agents.AzureAI" Version="1.55.0-preview" />
+    <PackageVersion Include="Microsoft.SemanticKernel.Agents.Core" Version="1.55.0" />
+    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI " Version="1.47.0" />
+    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.55.0-preview" />
+    <PackageVersion Include="Microsoft.SemanticKernel.Core" Version="1.55.0" />
+    <PackageVersion Include="Microsoft.SemanticKernel.PromptTemplates.Handlebars" Version="1.55.0" />
+    <PackageVersion Include="ModelContextProtocol" Version="0.2.0-preview.3" />
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="0.2.0-preview.3" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Update="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.55.0" />
+  </ItemGroup>
+</Project>

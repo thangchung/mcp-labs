@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Packages.props" />
+  </Folder>
   <Project Path="AppHost/AppHost.csproj" Id="6329625d-201c-4fb7-9e70-a21ffe57e979" />
   <Project Path="MCPClient/MCPClient.csproj" />
   <Project Path="MCPServer/MCPServer.csproj" />

@@ -4,9 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Azure.AI.Projects;
+using Azure.AI.Agents.Persistent;
 using Azure.Identity;
-using Microsoft.Extensions.Configuration;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.AzureAI;
@@ -68,7 +67,7 @@ internal sealed class AzureAIAgentWithMCPToolsSample : BaseSample
         await response!.Thread.DeleteAsync();
 
         // Delete the agent after use
-        await agent.Client.DeleteAgentAsync(agent.Id);
+        await agent.Client.Administration.DeleteAgentAsync(agent.Id);
     }
 
     /// <summary>
@@ -86,9 +85,9 @@ internal sealed class AzureAIAgentWithMCPToolsSample : BaseSample
             .AddEnvironmentVariables()
             .Build();
 
-        if (config["AzureAI:ConnectionString"] is not { } connectionString)
+        if (config["AzureAI:Endpoint"] is not { } endpoint)
         {
-            const string Message = "Please provide a valid `AzureAI:ConnectionString` secret to run this sample. See the associated README.md for more details.";
+            const string Message = "Please provide a valid `AzureAI:Endpoint` secret to run this sample. See the associated README.md for more details.";
             Console.Error.WriteLine(Message);
             throw new InvalidOperationException(Message);
         }
@@ -96,11 +95,9 @@ internal sealed class AzureAIAgentWithMCPToolsSample : BaseSample
         string modelId = config["AzureAI:ChatModelId"] ?? "gpt-4o-mini";
 
         // Create the Azure AI Agent
-        AIProjectClient projectClient = AzureAIAgent.CreateAzureAIClient(connectionString, new AzureCliCredential());
+        PersistentAgentsClient agentsClient = AzureAIAgent.CreateAgentsClient(endpoint, new AzureCliCredential());
 
-        AgentsClient agentsClient = projectClient.GetAgentsClient();
-
-        Azure.AI.Projects.Agent agent = await agentsClient.CreateAgentAsync(modelId, name, null, instructions);
+        PersistentAgent agent = await agentsClient.Administration.CreateAgentAsync(modelId, name, null, instructions);
 
         return new AzureAIAgent(agent, agentsClient)
         {
