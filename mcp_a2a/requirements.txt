@@ -1,0 +1,4 @@
+chainlit>=2.5.0
+google-adk>=1.2.0
+starlette>=0.37.0
+uvicorn[standard]>=0.24.0
