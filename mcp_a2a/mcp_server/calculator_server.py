@@ -6,7 +6,7 @@ from starlette.requests import Request
 from starlette.routing import Mount, Route
 
 from mcp.server.sse import SseServerTransport
-from calculator_tools import mcp
+from .calculator_tools import mcp
 
 # ─────────────────────────────────────────────
 # Logging Configuration
