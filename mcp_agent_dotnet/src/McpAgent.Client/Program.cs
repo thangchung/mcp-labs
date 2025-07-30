@@ -70,7 +70,7 @@ public class Program
                 else
                 {
                     logger.LogInformation("🚀 Using enhanced client mode");
-                    var enhancedClient = new EnhancedMcpClient(serverUrl, loggerFactory);
+                    var enhancedClient = new EnhancedMcpClientFixed(serverUrl, loggerFactory);
                     await enhancedClient.RunAsync();
                 }
             }
