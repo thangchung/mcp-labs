@@ -2,6 +2,7 @@
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text.Json;
 
 namespace McpAgent.Client;
@@ -42,6 +43,19 @@ public class Program
             aliases: ["--gemini-key", "-k"],
             description: "Google Gemini API key (required for Gemini modes)");
 
+        var openAiModeOption = new Option<bool>(
+            aliases: ["--openai", "-o"],
+            description: "Use OpenAI-powered client");
+
+        var openAiApiKeyOption = new Option<string>(
+            aliases: ["--openai-key", "-ok"],
+            description: "OpenAI API key (required for OpenAI mode)");
+
+        var openAiConfigOption = new Option<string>(
+            aliases: ["--openai-config", "-oc"],
+            description: "OpenAI configuration in format 'model:endpoint' (default: gpt-4o-mini:https://api.openai.com/v1)",
+            getDefaultValue: () => "gpt-4o-mini:https://api.openai.com/v1");
+
         var rootCommand = new RootCommand("MCP Agent Client - Interactive client for MCP agent server")
         {
             serverUrlOption,
@@ -50,11 +64,26 @@ public class Program
             basicModeOption,
             geminiModeOption,
             geminiEnhancedModeOption,
-            geminiApiKeyOption
+            geminiApiKeyOption,
+            openAiModeOption,
+            openAiApiKeyOption,
+            openAiConfigOption
         };
 
-        rootCommand.SetHandler(async (serverUrl, verbose, clearSession, basicMode, geminiMode, geminiEnhancedMode, geminiApiKey) =>
+        rootCommand.SetHandler(async (InvocationContext context) =>
         {
+            // Extract all parameter values from context
+            var serverUrl = context.ParseResult.GetValueForOption(serverUrlOption);
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var clearSession = context.ParseResult.GetValueForOption(clearSessionOption);
+            var basicMode = context.ParseResult.GetValueForOption(basicModeOption);
+            var geminiMode = context.ParseResult.GetValueForOption(geminiModeOption);
+            var geminiEnhancedMode = context.ParseResult.GetValueForOption(geminiEnhancedModeOption);
+            var geminiApiKey = context.ParseResult.GetValueForOption(geminiApiKeyOption);
+            var openAiMode = context.ParseResult.GetValueForOption(openAiModeOption);
+            var openAiApiKey = context.ParseResult.GetValueForOption(openAiApiKeyOption);
+            var openAiConfig = context.ParseResult.GetValueForOption(openAiConfigOption);
+
             // Configure logging
             using var loggerFactory = LoggerFactory.Create(builder =>
             {
@@ -76,7 +105,25 @@ public class Program
                     logger.LogInformation("🗑️ Existing session cleared");
                 }
 
-                if (geminiEnhancedMode)
+                if (openAiMode)
+                {
+                    if (string.IsNullOrWhiteSpace(openAiApiKey))
+                    {
+                        logger.LogError("❌ OpenAI API key is required when using --openai mode. Use --openai-key option.");
+                        Environment.Exit(1);
+                        return;
+                    }
+
+                    // Parse OpenAI configuration
+                    var configParts = openAiConfig.Split(':');
+                    var model = configParts.Length > 0 ? configParts[0] : "gpt-4o-mini";
+                    var endpoint = configParts.Length > 1 ? string.Join(":", configParts.Skip(1)) : "https://api.openai.com/v1";
+
+                    logger.LogInformation("🧠 Using OpenAI-powered client with model: {Model}, endpoint: {Endpoint}", model, endpoint);
+                    var openAiClient = new OpenAiMcpClientEnhanced(serverUrl, loggerFactory, openAiApiKey, model, endpoint);
+                    await openAiClient.RunAsync();
+                }
+                else if (geminiEnhancedMode)
                 {
                     if (string.IsNullOrWhiteSpace(geminiApiKey))
                     {
@@ -122,7 +169,7 @@ public class Program
             }
 
             logger.LogInformation("👋 Client shutting down");
-        }, serverUrlOption, verboseOption, clearSessionOption, basicModeOption, geminiModeOption, geminiEnhancedModeOption, geminiApiKeyOption);
+        });
 
         return await rootCommand.InvokeAsync(args);
     }

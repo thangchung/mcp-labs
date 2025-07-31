@@ -5,7 +5,7 @@ A C# implementation of Model Context Protocol (MCP) agents with resumable HTTP s
 Ref:
 
 - https://devblogs.microsoft.com/blog/can-you-build-agent2agent-communication-on-mcp-yes
-- https://github.com/victordibia/ai-agents-for-beginners/tree/main/11-mcp/code_samples/mcp-agents
+- https://github.com/microsoft/ai-agents-for-beginners/tree/main/11-mcp/code_samples/mcp-agents
 
 ## Features
 

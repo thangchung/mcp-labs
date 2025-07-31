@@ -4,53 +4,57 @@ using System.Text;
 
 namespace McpAgent.Client;
 
-/// <summary>
-/// Enhanced MCP client with Google Gemini AI integration featuring session management,
-/// MCP notifications, elicitation, and progress updates
-/// </summary>
-public class GeminiMcpClientEnhanced
+public class OpenAiMcpClientEnhanced
 {
     private readonly string _serverUrl;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly ILogger<GeminiMcpClientEnhanced> _logger;
+    private readonly ILogger<OpenAiMcpClientEnhanced> _logger;
     private readonly HttpClient _httpClient;
-    private readonly string _geminiApiKey;
+    private readonly string _model;
     private readonly SessionManager _sessionManager;
-    private readonly List<string> _conversationHistory;
+    private readonly List<object> _conversationHistory;
     private readonly List<NotificationMessage> _notifications;
     private int _elicitationCount;
     private int _samplingCount;
     private DateTime _sessionStartTime;
     private int _commandCount;
 
-    public GeminiMcpClientEnhanced(string serverUrl, ILoggerFactory loggerFactory, string geminiApiKey)
+    public OpenAiMcpClientEnhanced(string serverUrl, ILoggerFactory loggerFactory, string apiKey, string? model = null, string? endpoint = null)
     {
         if (string.IsNullOrWhiteSpace(serverUrl))
             throw new ArgumentException("Server URL cannot be null or empty", nameof(serverUrl));
-        if (string.IsNullOrWhiteSpace(geminiApiKey))
-            throw new ArgumentException("Gemini API key cannot be null or empty", nameof(geminiApiKey));
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("OpenAI API key cannot be null or empty", nameof(apiKey));
 
         _serverUrl = serverUrl;
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-        _logger = loggerFactory.CreateLogger<GeminiMcpClientEnhanced>();
-        _geminiApiKey = geminiApiKey;
-        _httpClient = new HttpClient();
+        _logger = loggerFactory.CreateLogger<OpenAiMcpClientEnhanced>();
+        _model = model ?? "gpt-4o-mini";
         _sessionManager = new SessionManager(_loggerFactory);
         _notifications = new List<NotificationMessage>();
         _elicitationCount = 0;
         _samplingCount = 0;
         _commandCount = 0;
-        
-        _conversationHistory = new List<string>
+
+        // Configure HTTP client for OpenAI API
+        _httpClient = new HttpClient();
+        var baseEndpoint = endpoint ?? "https://api.openai.com/v1";
+        _httpClient.BaseAddress = new Uri(baseEndpoint);
+        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
+        // Initialize conversation history with enhanced system prompt
+        _conversationHistory = new List<object>
         {
-            "System: You are an advanced AI assistant with enhanced MCP (Model Context Protocol) capabilities. " +
-            "You have access to travel booking and research tools through an MCP server with session management, " +
-            "progress tracking, intelligent elicitation, and MCP sampling for complex decisions. You can handle complex multi-step requests, " +
-            "maintain context across sessions, provide detailed progress updates, and use MCP sampling for AI-assisted decision making. " +
-            "Available tools: travel_agent (with enhanced booking features), research_agent (with deep analysis). " +
-            "Use MCP sampling when you need help making complex decisions during tool execution. " +
-            "Always be helpful, detailed, and proactive in gathering needed information."
+            new { role = "system", content = "You are an advanced AI assistant with enhanced MCP (Model Context Protocol) capabilities. " +
+                "You have access to travel booking and research tools through an MCP server with session management, " +
+                "progress tracking, intelligent elicitation, and MCP sampling for complex decisions. You can handle complex multi-step requests, " +
+                "maintain context across sessions, provide detailed progress updates, and use MCP sampling for AI-assisted decision making. " +
+                "Available tools: travel_agent (with enhanced booking features), research_agent (with deep analysis). " +
+                "Use MCP sampling when you need help making complex decisions during tool execution. " +
+                "Always be helpful, detailed, and proactive in gathering needed information." }
         };
+
+        _logger.LogInformation("🤖 Enhanced OpenAI client configured with model: {Model}, endpoint: {Endpoint}", _model, baseEndpoint);
     }
 
     /// <summary>
@@ -65,7 +69,7 @@ public class GeminiMcpClientEnhanced
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during enhanced Gemini client execution");
+            _logger.LogError(ex, "Error during enhanced OpenAI client execution");
             throw;
         }
         finally
@@ -83,17 +87,18 @@ public class GeminiMcpClientEnhanced
         var mcpClient = new DirectHttpMcpClient(httpClient, _serverUrl, _loggerFactory);
         
         // Enhanced initialization with progress tracking
-        _logger.LogInformation("🤖 Initializing Enhanced Gemini MCP Client...");
+        _logger.LogInformation("🤖 Initializing Enhanced OpenAI MCP Client...");
         await DisplayProgressBar("Connecting to MCP server", 0.3);
         
         await mcpClient.InitializeAsync();
         await DisplayProgressBar("Establishing AI connection", 0.6);
         
-        await Task.Delay(500); // Simulate AI initialization
+        // Test OpenAI connection
+        await TestOpenAIConnection();
         await DisplayProgressBar("Loading enhanced capabilities", 1.0);
         
-        _logger.LogInformation("✅ Enhanced Gemini MCP Client ready!");
-        _logger.LogInformation("🧠 AI Model: Google Gemini 1.5 Flash");
+        _logger.LogInformation("✅ Enhanced OpenAI MCP Client ready!");
+        _logger.LogInformation("🧠 AI Model: OpenAI {Model}", _model);
         _logger.LogInformation("🔧 Enhanced Features: Session Management, Notifications, Elicitation, Progress Tracking, MCP Sampling");
 
         try
@@ -120,10 +125,36 @@ public class GeminiMcpClientEnhanced
         }
     }
 
+    private async Task TestOpenAIConnection()
+    {
+        var testPayload = new
+        {
+            model = _model,
+            messages = new[]
+            {
+                new { role = "user", content = "Hello, this is a connection test. Please respond with 'Connection successful'." }
+            },
+            max_tokens = 50
+        };
+
+        var json = JsonSerializer.Serialize(testPayload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync("/chat/completions", content);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"OpenAI API test failed: {response.StatusCode} - {errorContent}");
+        }
+
+        _logger.LogInformation("🔗 OpenAI connection test successful");
+    }
+
     private async Task DisplayEnhancedServerInfo(DirectHttpMcpClient client)
     {
-        _logger.LogInformation("🚀 Enhanced Gemini MCP Client Features:");
-        _logger.LogInformation("  • 🧠 Google Gemini AI integration with natural language processing");
+        _logger.LogInformation("🚀 Enhanced OpenAI MCP Client Features:");
+        _logger.LogInformation("  • 🧠 OpenAI {Model} integration with natural language processing", _model);
         _logger.LogInformation("  • 📊 Advanced progress tracking with AI-guided updates");
         _logger.LogInformation("  • 🔄 Intelligent session persistence with context restoration");
         _logger.LogInformation("  • 📬 MCP notification system with AI interpretation");
@@ -145,7 +176,7 @@ public class GeminiMcpClientEnhanced
             _logger.LogInformation("  🤖 {ToolName} (AI-Enhanced)", name);
             _logger.LogInformation("     Original: {Description}", description);
             _logger.LogInformation("     AI Features: Smart parameter elicitation, context awareness, progress tracking, MCP sampling");
-            _logger.LogInformation("     Status: ✅ Ready with Gemini integration");
+            _logger.LogInformation("     Status: ✅ Ready with OpenAI integration");
         }
         _logger.LogInformation("");
     }
@@ -155,13 +186,13 @@ public class GeminiMcpClientEnhanced
         _logger.LogInformation("📋 AI is resuming {ToolName} with enhanced context...", sessionInfo.LastTool);
         
         // Add session context to conversation history
-        _conversationHistory.Add($"System: Resuming previous session - Tool: {sessionInfo.LastTool}, Args: {JsonSerializer.Serialize(sessionInfo.LastArgs)}");
+        _conversationHistory.Add(new { role = "system", content = $"Resuming previous session - Tool: {sessionInfo.LastTool}, Args: {JsonSerializer.Serialize(sessionInfo.LastArgs)}" });
         
         // Get AI analysis of the resumption
-        var resumeAnalysis = await GetGeminiResponse(new List<string>
+        var resumeAnalysis = await GetOpenAIResponse(new[]
         {
-            _conversationHistory[0], // System prompt
-            $"Analyze this session resumption: Tool '{sessionInfo.LastTool}' with arguments {JsonSerializer.Serialize(sessionInfo.LastArgs)}. Provide a brief status update."
+            new { role = "system", content = "You are analyzing a session resumption." },
+            new { role = "user", content = $"Analyze this session resumption: Tool '{sessionInfo.LastTool}' with arguments {JsonSerializer.Serialize(sessionInfo.LastArgs)}. Provide a brief status update." }
         });
         
         _logger.LogInformation("🧠 AI Analysis: {Analysis}", resumeAnalysis);
@@ -215,7 +246,7 @@ public class GeminiMcpClientEnhanced
     {
         while (true)
         {
-            Console.Write("🧠 Gemini> ");
+            Console.Write("🧠 OpenAI> ");
             var input = Console.ReadLine()?.Trim();
 
             if (string.IsNullOrEmpty(input))
@@ -268,17 +299,17 @@ public class GeminiMcpClientEnhanced
     private async Task ProcessNaturalLanguageInput(DirectHttpMcpClient client, string userInput)
     {
         // Add user input to conversation history
-        _conversationHistory.Add($"User: {userInput}");
+        _conversationHistory.Add(new { role = "user", content = userInput });
 
         // Get AI analysis and intent detection
         var intentAnalysis = "Intent analysis unavailable";
         try
         {
-            intentAnalysis = await GetGeminiResponse(new List<string>
+            intentAnalysis = await GetOpenAIResponse(new[]
             {
-                _conversationHistory[0], // System prompt
-                $"Analyze this user input and determine intent: '{userInput}'. " +
-                "Respond with: 1) Intent (travel/research/question/other), 2) Required tool if any, 3) Missing information that needs elicitation, 4) Confidence level"
+                new { role = "system", content = "You are an intent analysis assistant. Analyze user inputs and determine appropriate MCP tool usage." },
+                new { role = "user", content = $"Analyze this user input and determine intent: '{userInput}'. " +
+                    "Respond with: 1) Intent (travel/research/question/other), 2) Required tool if any, 3) Missing information that needs elicitation, 4) Confidence level" }
             });
         }
         catch (Exception ex)
@@ -320,16 +351,16 @@ public class GeminiMcpClientEnhanced
             // Direct AI conversation with fallback
             try
             {
-                var aiResponse = await GetGeminiResponse(_conversationHistory);
-                Console.WriteLine($"🤖 Gemini: {aiResponse}");
-                _conversationHistory.Add($"Assistant: {aiResponse}");
+                var aiResponse = await GetOpenAIResponse(_conversationHistory.ToArray());
+                Console.WriteLine($"🤖 OpenAI: {aiResponse}");
+                _conversationHistory.Add(new { role = "assistant", content = aiResponse });
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to get AI conversation response, using fallback");
                 var fallbackResponse = await GetFallbackResponse(userInput);
                 Console.WriteLine($"🤖 Assistant: {fallbackResponse}");
-                _conversationHistory.Add($"Assistant: {fallbackResponse}");
+                _conversationHistory.Add(new { role = "assistant", content = fallbackResponse });
             }
         }
     }
@@ -361,13 +392,15 @@ public class GeminiMcpClientEnhanced
     {
         try
         {
-            var extractionPrompt = $"Extract the {parameterDescription} from this user input: '{userInput}'. " +
-                                  $"If no clear {parameterDescription} is specified, return 'ELICIT_NEEDED'. " +
-                                  $"Only return the extracted value or 'ELICIT_NEEDED'.";
+            var extractionResponse = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a parameter extraction assistant. Extract specific information from user input." },
+                new { role = "user", content = $"Extract the {parameterDescription} from this user input: '{userInput}'. " +
+                    $"If no clear {parameterDescription} is specified, return 'ELICIT_NEEDED'. " +
+                    $"Only return the extracted value or 'ELICIT_NEEDED'." }
+            });
 
-            var extractedValue = await GetGeminiResponse(new List<string> { extractionPrompt });
-            
-            return extractedValue.Trim();
+            return extractionResponse.Trim();
         }
         catch (Exception ex)
         {
@@ -467,8 +500,11 @@ public class GeminiMcpClientEnhanced
     {
         try
         {
-            // Use Gemini AI to determine if MCP sampling would be beneficial
-            var samplingCheckPrompt = $@"Analyze this tool execution scenario and determine if MCP sampling (server-side AI assistance) would be helpful:
+            // Use OpenAI to determine if MCP sampling would be beneficial
+            var decision = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a decision assistant. Determine if MCP sampling (server-side AI assistance) would be helpful for tool execution scenarios." },
+                new { role = "user", content = $@"Analyze this tool execution scenario and determine if MCP sampling (server-side AI assistance) would be helpful:
 
 Tool: {toolAction.ToolName}
 Arguments: {JsonSerializer.Serialize(toolAction.Arguments)}
@@ -480,9 +516,8 @@ MCP sampling is useful when:
 - The tool execution involves trade-offs that need expert evaluation
 - Context from the server could improve the decision quality
 
-Respond with only 'YES' if MCP sampling would be beneficial, or 'NO' if the current information is sufficient.";
-
-            var decision = await GetGeminiResponse(new List<string> { samplingCheckPrompt });
+Respond with only 'YES' if MCP sampling would be beneficial, or 'NO' if the current information is sufficient." }
+            });
             
             return decision.Trim().ToUpperInvariant().Contains("YES");
         }
@@ -522,7 +557,7 @@ Please provide:
 
 Your response will guide the enhanced execution of this tool.";
 
-            // Request MCP sampling from the server
+            // Request MCP sampling from the server - but handle if server doesn't support it
             var samplingResult = await client.CreateSampleAsync(
                 prompt: samplingPrompt,
                 maxTokens: 500,
@@ -560,7 +595,7 @@ Your response will guide the enhanced execution of this tool.";
                 Console.WriteLine();
 
                 // Add server advice to conversation history
-                _conversationHistory.Add($"MCP Server AI Advice for {toolAction.ToolName}: {serverAdvice}");
+                _conversationHistory.Add(new { role = "system", content = $"MCP Server AI Advice for {toolAction.ToolName}: {serverAdvice}" });
                 
                 // Ask user if they want to proceed with modifications based on server advice
                 Console.WriteLine("🔄 Would you like to modify your request based on this AI advice? (y/n)");
@@ -575,7 +610,7 @@ Your response will guide the enhanced execution of this tool.";
                     {
                         // Re-analyze with the modification
                         var modifiedInput = $"{userInput} (Modified: {modification})";
-                        _conversationHistory.Add($"User modification: {modification}");
+                        _conversationHistory.Add(new { role = "user", content = $"User modification: {modification}" });
                         
                         // Update tool action based on modification
                         await UpdateToolActionWithModification(toolAction, modification, serverAdvice);
@@ -595,8 +630,8 @@ Your response will guide the enhanced execution of this tool.";
             _logger.LogInformation("ℹ️ MCP server doesn't support sampling, using client-side AI analysis instead");
             await AddNotification("Server doesn't support MCP sampling, using client-side AI analysis", NotificationType.Info);
             
-            // Fallback to client-side Gemini analysis when server doesn't support sampling
-            await PerformClientSideGeminiAnalysis(toolAction, userInput);
+            // Fallback to client-side OpenAI analysis when server doesn't support sampling
+            await PerformClientSideAnalysis(toolAction, userInput);
         }
         catch (Exception ex)
         {
@@ -608,11 +643,11 @@ Your response will guide the enhanced execution of this tool.";
         }
     }
 
-    private async Task PerformClientSideGeminiAnalysis(ToolAction toolAction, string userInput)
+    private async Task PerformClientSideAnalysis(ToolAction toolAction, string userInput)
     {
         try
         {
-            Console.WriteLine("🤖 Performing client-side Gemini analysis instead of MCP sampling...");
+            Console.WriteLine("🤖 Performing client-side AI analysis instead of MCP sampling...");
             
             var analysisPrompt = $@"As an AI assistant, analyze this tool execution scenario and provide advice:
 
@@ -628,17 +663,21 @@ Please provide:
 
 Keep your response concise but helpful.";
 
-            var clientAnalysis = await GetGeminiResponse(new List<string> { analysisPrompt });
+            var clientAnalysis = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a helpful AI assistant providing tool execution analysis and recommendations." },
+                new { role = "user", content = analysisPrompt }
+            });
 
             Console.WriteLine();
-            Console.WriteLine("🤖 Client-Side Gemini Analysis:");
-            Console.WriteLine("═══════════════════════════════");
-            Console.WriteLine($"🧠 Gemini: {clientAnalysis}");
-            Console.WriteLine("═══════════════════════════════");
+            Console.WriteLine("🤖 Client-Side AI Analysis:");
+            Console.WriteLine("════════════════════════════");
+            Console.WriteLine($"🧠 AI: {clientAnalysis}");
+            Console.WriteLine("════════════════════════════");
             Console.WriteLine();
 
             // Add analysis to conversation history
-            _conversationHistory.Add($"Client Gemini Analysis for {toolAction.ToolName}: {clientAnalysis}");
+            _conversationHistory.Add(new { role = "system", content = $"Client AI Analysis for {toolAction.ToolName}: {clientAnalysis}" });
             
             // Ask user if they want to proceed with modifications based on analysis
             Console.WriteLine("🔄 Would you like to modify your request based on this analysis? (y/n)");
@@ -652,37 +691,39 @@ Keep your response concise but helpful.";
                 if (!string.IsNullOrEmpty(modification))
                 {
                     var modifiedInput = $"{userInput} (Modified: {modification})";
-                    _conversationHistory.Add($"User modification: {modification}");
+                    _conversationHistory.Add(new { role = "user", content = $"User modification: {modification}" });
                     
                     // Update tool action based on modification
                     await UpdateToolActionWithModification(toolAction, modification, clientAnalysis);
                 }
             }
 
-            await AddNotification($"Client-side Gemini analysis completed for {toolAction.ToolName}", NotificationType.Success);
+            await AddNotification($"Client-side AI analysis completed for {toolAction.ToolName}", NotificationType.Success);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Client-side Gemini analysis also failed, proceeding with original parameters");
-            Console.WriteLine("⚠️ Gemini analysis unavailable, proceeding with original parameters...");
+            _logger.LogWarning(ex, "Client-side analysis also failed, proceeding with original parameters");
+            Console.WriteLine("⚠️ AI analysis unavailable, proceeding with original parameters...");
         }
     }
 
     private async Task UpdateToolActionWithModification(ToolAction toolAction, string modification, string serverAdvice)
     {
-        // Use Gemini to interpret the modification and update tool parameters
-        var updatePrompt = $@"Based on this modification request and server advice, update the tool parameters:
+        // Use OpenAI to interpret the modification and update tool parameters
+        try
+        {
+            var updatedParamsResponse = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a parameter update assistant. Based on user modifications and server advice, update tool parameters. Return only valid JSON." },
+                new { role = "user", content = $@"Based on this modification request and server advice, update the tool parameters:
 
 Original Tool: {toolAction.ToolName}
 Original Arguments: {JsonSerializer.Serialize(toolAction.Arguments)}
 User Modification: '{modification}'
 Server AI Advice: '{serverAdvice}'
 
-Provide updated arguments in JSON format. Only return the JSON object, nothing else.";
-
-        try
-        {
-            var updatedParamsResponse = await GetGeminiResponse(new List<string> { updatePrompt });
+Provide updated arguments in JSON format. Only return the JSON object, nothing else." }
+            });
             
             // Try to parse the response as JSON and update tool action
             var cleanResponse = updatedParamsResponse.Trim();
@@ -735,20 +776,22 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
 
         foreach (var missingParam in missingInfo)
         {
-            var elicitationPrompt = $"The user wants to use {toolAction.ToolName} but didn't specify the {missingParam}. " +
-                                   $"Generate a friendly, helpful question to ask them for this information. " +
-                                   $"Original request: '{originalInput}'";
-
-            var question = await GetGeminiResponse(new List<string> { elicitationPrompt });
+            var question = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a helpful assistant that asks clarifying questions to gather missing information." },
+                new { role = "user", content = $"The user wants to use {toolAction.ToolName} but didn't specify the {missingParam}. " +
+                    $"Generate a friendly, helpful question to ask them for this information. " +
+                    $"Original request: '{originalInput}'" }
+            });
             
-            Console.WriteLine($"🤖 Gemini: {question}");
+            Console.WriteLine($"🤖 OpenAI: {question}");
             Console.Write($"💭 You ({missingParam}): ");
             
             var userResponse = Console.ReadLine()?.Trim();
             if (!string.IsNullOrEmpty(userResponse))
             {
                 toolAction.Arguments[missingParam] = userResponse;
-                _conversationHistory.Add($"User provided {missingParam}: {userResponse}");
+                _conversationHistory.Add(new { role = "user", content = $"User provided {missingParam}: {userResponse}" });
             }
         }
 
@@ -839,11 +882,28 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
 
     private async Task<List<string>> GenerateProgressMessages(string toolName, Dictionary<string, object?> args)
     {
-        var prompt = $"Generate 4 short, specific progress messages for executing {toolName} with arguments {JsonSerializer.Serialize(args)}. " +
-                    "Make them realistic and tool-specific. Return only the messages, one per line.";
+        try
+        {
+            var response = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a progress message generator. Generate realistic, tool-specific progress messages." },
+                new { role = "user", content = $"Generate 4 short, specific progress messages for executing {toolName} with arguments {JsonSerializer.Serialize(args)}. " +
+                    "Make them realistic and tool-specific. Return only the messages, one per line." }
+            });
 
-        var response = await GetGeminiResponse(new List<string> { prompt });
-        return response.Split('\n', StringSplitOptions.RemoveEmptyEntries).Take(4).ToList();
+            return response.Split('\n', StringSplitOptions.RemoveEmptyEntries).Take(4).ToList();
+        }
+        catch
+        {
+            // Fallback progress messages
+            return new List<string>
+            {
+                $"🔄 Initializing {toolName}...",
+                $"⚙️ Processing parameters...",
+                $"🔍 Executing {toolName}...",
+                $"📊 Finalizing results..."
+            };
+        }
     }
 
     private async Task DisplayAIEnhancedResult(JsonElement result, string toolName)
@@ -866,14 +926,25 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
         }
 
         // AI analysis of the result
-        var analysisPrompt = $"Analyze this {toolName} result and provide insights: '{resultText}'. " +
-                           "Identify key information, potential next steps, and any important details to highlight.";
-        
-        var aiAnalysis = await GetGeminiResponse(new List<string> { analysisPrompt });
-        
-        Console.WriteLine();
-        Console.WriteLine("🧠 AI Analysis:");
-        Console.WriteLine(aiAnalysis);
+        try
+        {
+            var aiAnalysis = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a result analysis assistant. Analyze tool execution results and provide insights." },
+                new { role = "user", content = $"Analyze this {toolName} result and provide insights: '{resultText}'. " +
+                    "Identify key information, potential next steps, and any important details to highlight." }
+            });
+            
+            Console.WriteLine();
+            Console.WriteLine("🧠 AI Analysis:");
+            Console.WriteLine(aiAnalysis);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get AI analysis of result");
+            Console.WriteLine();
+            Console.WriteLine("🧠 AI Analysis: Analysis temporarily unavailable");
+        }
         
         Console.WriteLine("═══════════════════════════════");
         Console.WriteLine();
@@ -881,130 +952,54 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
         await AddNotification($"Tool result analyzed by AI: {toolName} execution completed", NotificationType.Success);
     }
 
-    private async Task<string> GetGeminiResponse(List<string> conversationHistory)
+    private async Task<string> GetOpenAIResponse(object[] messages)
     {
-        // Validate API key format
-        if (string.IsNullOrWhiteSpace(_geminiApiKey) || _geminiApiKey == "fake-key-for-testing")
-        {
-            var keyError = "Invalid or missing Gemini API key. Please provide a valid API key from https://ai.google.dev/gemini-api/docs/api-key";
-            _logger.LogError(keyError);
-            await AddNotification(keyError, NotificationType.Error);
-            return "Please configure a valid Gemini API key to use AI features.";
-        }
-
         try
         {
-            var prompt = string.Join("\n", conversationHistory);
-            
-            // Limit prompt length to avoid API limits
-            if (prompt.Length > 30000)
+            var payload = new
             {
-                prompt = prompt.Substring(0, 30000) + "...[truncated]";
-                _logger.LogWarning("Prompt truncated to fit API limits");
-            }
-            
-            var requestBody = new
-            {
-                contents = new[]
-                {
-                    new
-                    {
-                        parts = new[]
-                        {
-                            new { text = prompt }
-                        }
-                    }
-                },
-                generationConfig = new
-                {
-                    temperature = 0.7,
-                    topK = 40,
-                    topP = 0.95,
-                    maxOutputTokens = 1024
-                }
+                model = _model,
+                messages = messages,
+                max_tokens = 500,
+                temperature = 0.7
             };
 
-            var json = JsonSerializer.Serialize(requestBody);
+            var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_geminiApiKey}";
-            
-            // Add timeout and retry logic
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var response = await _httpClient.PostAsync(url, content, cts.Token);
+            var response = await _httpClient.PostAsync("/chat/completions", content);
             
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Gemini API error: {StatusCode} - {ErrorContent}", response.StatusCode, errorContent);
-                
-                var errorMessage = response.StatusCode switch
-                {
-                    System.Net.HttpStatusCode.Unauthorized => "Invalid Gemini API key. Please check your API key is correct and active.",
-                    System.Net.HttpStatusCode.Forbidden => "Gemini API access forbidden. Check your API key permissions and quota.",
-                    System.Net.HttpStatusCode.TooManyRequests => "Gemini API rate limit exceeded. Please wait a moment and try again.",
-                    System.Net.HttpStatusCode.ServiceUnavailable => "Gemini API service is temporarily unavailable. This could be due to maintenance or high load. Please try again in a few minutes.",
-                    System.Net.HttpStatusCode.BadRequest => $"Invalid request to Gemini API. Error details: {errorContent}",
-                    _ => $"Gemini API error ({response.StatusCode}): {errorContent}"
-                };
-                
-                await AddNotification($"Gemini API error: {errorMessage}", NotificationType.Error);
-                Console.WriteLine($"⚠️ {errorMessage}");
-                
-                return "I'm sorry, I couldn't generate a response due to an API issue. Please check the error details above.";
+                _logger.LogError("OpenAI API error: {StatusCode} - {Content}", response.StatusCode, errorContent);
+                throw new Exception($"OpenAI API error: {response.StatusCode} - {errorContent}");
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
-            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(responseJson);
+            var responseObj = JsonSerializer.Deserialize<JsonElement>(responseJson);
             
-            if (jsonDoc.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
+            var choices = responseObj.GetProperty("choices");
+            if (choices.GetArrayLength() > 0)
             {
-                var firstCandidate = candidates[0];
-                if (firstCandidate.TryGetProperty("content", out var contentProperty) &&
-                    contentProperty.TryGetProperty("parts", out var parts) && parts.GetArrayLength() > 0)
-                {
-                    var firstPart = parts[0];
-                    if (firstPart.TryGetProperty("text", out var text))
-                    {
-                        return text.GetString() ?? "I'm sorry, I couldn't generate a response.";
-                    }
-                }
+                var firstChoice = choices[0];
+                var message = firstChoice.GetProperty("message");
+                var responseContent = message.GetProperty("content").GetString();
+                return responseContent ?? "I apologize, but I couldn't generate a proper response.";
             }
 
-            return "I'm sorry, I couldn't generate a response.";
-        }
-        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
-        {
-            var timeoutError = "Gemini API request timed out. The service might be experiencing high load.";
-            _logger.LogError(ex, timeoutError);
-            await AddNotification(timeoutError, NotificationType.Error);
-            return "I'm sorry, the request timed out. Please try again.";
-        }
-        catch (HttpRequestException ex)
-        {
-            var networkError = "Network error connecting to Gemini API. Please check your internet connection.";
-            _logger.LogError(ex, networkError);
-            await AddNotification($"Network error: {ex.Message}", NotificationType.Error);
-            return "I'm sorry, there was a network error. Please check your connection and try again.";
-        }
-        catch (JsonException ex)
-        {
-            var jsonError = "Error parsing Gemini API response. The service might be experiencing issues.";
-            _logger.LogError(ex, jsonError);
-            await AddNotification($"JSON parsing error: {ex.Message}", NotificationType.Error);
-            return "I'm sorry, there was an error processing the API response.";
+            return "I apologize, but I couldn't generate a proper response.";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error getting Gemini response");
-            await AddNotification($"Gemini API error: {ex.Message}", NotificationType.Error);
-            return "I'm sorry, I encountered an unexpected error while processing your request.";
+            _logger.LogError(ex, "Failed to get OpenAI response");
+            throw;
         }
     }
 
     private Task<string> GetFallbackResponse(string context)
     {
-        // Provide intelligent fallbacks when Gemini API is unavailable
+        // Provide intelligent fallbacks when OpenAI API is unavailable
         var contextLower = context.ToLowerInvariant();
         
         if (contextLower.Contains("travel") || contextLower.Contains("destination"))
@@ -1062,15 +1057,16 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
     private Task ShowAIEnhancedHelp()
     {
         Console.WriteLine();
-        Console.WriteLine("📖 Enhanced Gemini MCP Client Help");
+        Console.WriteLine("📖 Enhanced OpenAI MCP Client Help");
         Console.WriteLine("═══════════════════════════════════");
-        Console.WriteLine("🧠 AI-Powered Features:");
-        Console.WriteLine("  • Natural language conversation with Google Gemini");
+        Console.WriteLine($"🧠 AI-Powered Features (using {_model}):");
+        Console.WriteLine("  • Natural language conversation with OpenAI");
         Console.WriteLine("  • Smart parameter elicitation for incomplete requests");
         Console.WriteLine("  • MCP sampling for server-side AI assistance with complex decisions");
         Console.WriteLine("  • AI-guided progress tracking and execution");
         Console.WriteLine("  • Intelligent result analysis and insights");
         Console.WriteLine("  • Context-aware session management");
+        Console.WriteLine("  • Support for GitHub AI Models endpoint");
         Console.WriteLine();
         Console.WriteLine("💬 Natural Language Examples:");
         Console.WriteLine("  'I want to travel to Tokyo next month'");
@@ -1105,16 +1101,29 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
             var description = tool.GetProperty("description").GetString();
             
             // Get AI enhancement for tool description
-            var enhancementPrompt = $"Enhance this tool description with AI capabilities: '{description}' for tool '{name}'. " +
-                                   "Mention smart elicitation, progress tracking, MCP sampling for complex decisions, and AI analysis features.";
-            
-            var aiEnhancement = await GetGeminiResponse(new List<string> { enhancementPrompt });
-            
-            Console.WriteLine($"🤖 {name} (AI-Enhanced)");
-            Console.WriteLine($"   Original: {description}");
-            Console.WriteLine($"   AI Features: {aiEnhancement}");
-            Console.WriteLine($"   Status: ✅ Ready with Gemini integration");
-            Console.WriteLine();
+            try
+            {
+                var aiEnhancement = await GetOpenAIResponse(new[]
+                {
+                    new { role = "system", content = "You are a tool description enhancer. Describe how AI capabilities enhance tool functionality." },
+                    new { role = "user", content = $"Enhance this tool description with AI capabilities: '{description}' for tool '{name}'. " +
+                        "Mention smart elicitation, progress tracking, MCP sampling for complex decisions, and AI analysis features." }
+                });
+                
+                Console.WriteLine($"🤖 {name} (AI-Enhanced)");
+                Console.WriteLine($"   Original: {description}");
+                Console.WriteLine($"   AI Features: {aiEnhancement}");
+                Console.WriteLine($"   Status: ✅ Ready with OpenAI integration");
+                Console.WriteLine();
+            }
+            catch
+            {
+                Console.WriteLine($"🤖 {name} (AI-Enhanced)");
+                Console.WriteLine($"   Original: {description}");
+                Console.WriteLine($"   AI Features: Smart elicitation, progress tracking, MCP sampling, AI analysis");
+                Console.WriteLine($"   Status: ✅ Ready with OpenAI integration");
+                Console.WriteLine();
+            }
         }
         Console.WriteLine("════════════════════════════════════");
         Console.WriteLine();
@@ -1133,15 +1142,25 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
         Console.WriteLine($"🎯 Elicitations Performed: {_elicitationCount}");
         Console.WriteLine($"🎲 MCP Samplings Performed: {_samplingCount}");
         Console.WriteLine($"📬 Notifications: {_notifications.Count}");
-        Console.WriteLine($"✅ Connection Status: Active with Gemini AI");
+        Console.WriteLine($"✅ Connection Status: Active with OpenAI {_model}");
         Console.WriteLine($"💾 Session Persistence: AI-Enhanced");
         
         // AI-generated session insights
-        var insightPrompt = $"Generate insights about this session: {_commandCount} commands, {_elicitationCount} elicitations, " +
-                           $"{_samplingCount} MCP samplings, {duration.TotalMinutes:F1} minutes duration. Provide 2-3 key observations.";
-        
-        var insights = await GetGeminiResponse(new List<string> { insightPrompt });
-        Console.WriteLine($"🧠 AI Insights: {insights}");
+        try
+        {
+            var insights = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a session analytics assistant. Generate insights about user sessions." },
+                new { role = "user", content = $"Generate insights about this session: {_commandCount} commands, {_elicitationCount} elicitations, " +
+                    $"{_samplingCount} MCP samplings, {duration.TotalMinutes:F1} minutes duration. Provide 2-3 key observations." }
+            });
+            
+            Console.WriteLine($"🧠 AI Insights: {insights}");
+        }
+        catch
+        {
+            Console.WriteLine($"🧠 AI Insights: Session running smoothly with {_commandCount} commands processed");
+        }
         
         Console.WriteLine("════════════════════════════════");
         Console.WriteLine();
@@ -1186,12 +1205,22 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
 
     private async Task ClearSessionWithAIConfirmation()
     {
-        var confirmationPrompt = "Generate a friendly confirmation message asking if the user really wants to clear their session. " +
-                               "Mention they'll lose conversation history and session state.";
+        try
+        {
+            var confirmationMessage = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a helpful assistant that asks for confirmation when clearing sessions." },
+                new { role = "user", content = "Generate a friendly confirmation message asking if the user really wants to clear their session. " +
+                    "Mention they'll lose conversation history and session state." }
+            });
+            
+            Console.WriteLine($"🤖 OpenAI: {confirmationMessage}");
+        }
+        catch
+        {
+            Console.WriteLine("🤖 Are you sure you want to clear your session? This will remove all conversation history and session state. (yes/no)");
+        }
         
-        var confirmationMessage = await GetGeminiResponse(new List<string> { confirmationPrompt });
-        
-        Console.WriteLine($"🤖 Gemini: {confirmationMessage}");
         Console.Write("💭 Your response (yes/no): ");
         
         var response = Console.ReadLine()?.Trim().ToLowerInvariant();
@@ -1220,37 +1249,47 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
         var sessionDuration = DateTime.UtcNow - _sessionStartTime;
         
         // Generate AI summary
-        var summaryPrompt = $"Generate a friendly session summary: {_commandCount} commands, {_elicitationCount} elicitations, " +
-                           $"{_samplingCount} MCP samplings, {sessionDuration.TotalMinutes:F1} minutes, {_notifications.Count} notifications. " +
-                           "Make it conversational and positive.";
-        
-        var aiSummary = await GetGeminiResponse(new List<string> { summaryPrompt });
-        
-        Console.WriteLine();
-        Console.WriteLine("👋 Enhanced Gemini MCP Session Ending");
-        Console.WriteLine("════════════════════════════════════");
-        Console.WriteLine($"🤖 Gemini: {aiSummary}");
-        Console.WriteLine("════════════════════════════════════");
-        
-        _logger.LogInformation("🧠 AI-enhanced session completed successfully");
+        try
+        {
+            var aiSummary = await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are a session summary assistant. Generate friendly, conversational session summaries." },
+                new { role = "user", content = $"Generate a friendly session summary: {_commandCount} commands, {_elicitationCount} elicitations, " +
+                    $"{_samplingCount} MCP samplings, {sessionDuration.TotalMinutes:F1} minutes, {_notifications.Count} notifications. " +
+                    "Make it conversational and positive." }
+            });
+            
+            Console.WriteLine();
+            Console.WriteLine("👋 Enhanced OpenAI MCP Session Ending");
+            Console.WriteLine("════════════════════════════════════");
+            Console.WriteLine($"🤖 OpenAI: {aiSummary}");
+            Console.WriteLine("════════════════════════════════════");
+        }
+        catch
+        {
+            Console.WriteLine();
+            Console.WriteLine("👋 Enhanced OpenAI MCP Session Ending");
+            Console.WriteLine("════════════════════════════════════");
+            Console.WriteLine($"🤖 Thank you for using the enhanced OpenAI MCP client!");
+            Console.WriteLine($"📊 Session summary: {_commandCount} commands, {sessionDuration.TotalMinutes:F1} minutes");
+            Console.WriteLine("════════════════════════════════════");
+        }
     }
 
     private Task AddNotification(string message, NotificationType type)
     {
-        var notification = new NotificationMessage
-        {
-            Message = message,
-            Type = type,
-            Timestamp = DateTime.UtcNow
-        };
-        
-        _notifications.Add(notification);
-        
-        // Keep only last 50 notifications
         if (_notifications.Count > 50)
         {
             _notifications.RemoveAt(0);
         }
+
+        _notifications.Add(new NotificationMessage
+        {
+            Timestamp = DateTime.UtcNow,
+            Message = message,
+            Type = type
+        });
+
         return Task.CompletedTask;
     }
 
@@ -1258,39 +1297,41 @@ Provide updated arguments in JSON format. Only return the JSON object, nothing e
     {
         try
         {
-            var prompt = $@"The user tried to use tool '{toolName}' with input '{originalInput}' but got this error: '{errorMessage}'.
-
-Please provide a helpful suggestion on how to fix this issue or what the user should try instead. Keep it concise and actionable.
-
-Examples:
-- If it's a server error, suggest checking if the MCP server is running
-- If it's a parameter error, suggest what information might be missing
-- If it's a network error, suggest checking connectivity
-
-Suggestion:";
-
-            var response = await GetGeminiResponse(new List<string> { prompt });
-            return response.Trim();
+            return await GetOpenAIResponse(new[]
+            {
+                new { role = "system", content = "You are an error analysis assistant. Provide helpful suggestions when tool execution fails." },
+                new { role = "user", content = $"Tool '{toolName}' failed with error: '{errorMessage}'. " +
+                    $"Original user input: '{originalInput}'. " +
+                    "Provide a helpful suggestion for what the user might try differently." }
+            });
         }
         catch
         {
-            // Fallback suggestions based on common error patterns
-            if (errorMessage.Contains("500") || errorMessage.Contains("Internal Server Error"))
-            {
-                return "The MCP server encountered an internal error. Try checking if the server is properly configured and running, or try again in a moment.";
-            }
-            else if (errorMessage.Contains("404") || errorMessage.Contains("Not Found"))
-            {
-                return "The requested tool or endpoint was not found. Make sure the MCP server supports this tool.";
-            }
-            else if (errorMessage.Contains("timeout") || errorMessage.Contains("network"))
-            {
-                return "There was a network issue. Check your connection and ensure the MCP server is accessible.";
-            }
-            else
-            {
-                return "An unexpected error occurred. Try rephrasing your request or check the server logs for more details.";
-            }
+            return $"There was an error with {toolName}. You might want to try rephrasing your request or checking if all required information was provided.";
         }
+    }
+
+    public void Dispose()
+    {
+        _httpClient?.Dispose();
+    }
+
+    // Helper classes
+    internal class ToolAction
+    {
+        public string ToolName { get; set; } = "";
+        public Dictionary<string, object?> Arguments { get; set; } = new();
+
+        public ToolAction(string toolName, Dictionary<string, object?> arguments)
+        {
+            ToolName = toolName;
+            Arguments = arguments;
+        }
+    }
+
+    internal class ToolAnalysis
+    {
+        public string? ToolName { get; set; }
+        public Dictionary<string, object?>? Arguments { get; set; }
     }
 }
