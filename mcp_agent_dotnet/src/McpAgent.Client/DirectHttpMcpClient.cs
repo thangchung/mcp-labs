@@ -40,17 +40,38 @@ public class DirectHttpMcpClient : IDisposable
         _logger.LogDebug("Sending request: {Method} with ID: {RequestId}", method, requestId);
 
         var response = await _httpClient.PostAsync(_mcpEndpoint, content);
-        response.EnsureSuccessStatusCode();
-
+        
         var responseJson = await response.Content.ReadAsStringAsync();
-        _logger.LogDebug("Received response: {Response}", responseJson);
+        _logger.LogDebug("Received response: {Response} (Status: {StatusCode})", responseJson, response.StatusCode);
+
+        // Check for HTTP errors first, but read the response body to get detailed error info
+        if (!response.IsSuccessStatusCode)
+        {
+            try 
+            {
+                var errorDocument = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                if (errorDocument.TryGetProperty("error", out var httpError))
+                {
+                    var errorMessage = httpError.TryGetProperty("message", out var msg) ? msg.GetString() : "Unknown server error";
+                    var errorCode = httpError.TryGetProperty("code", out var code) ? code.GetInt32().ToString() : "Unknown";
+                    throw new InvalidOperationException($"Server error ({response.StatusCode}): {errorMessage} (Code: {errorCode})");
+                }
+            }
+            catch (JsonException)
+            {
+                // If we can't parse the JSON, fall back to the raw response
+            }
+            
+            throw new HttpRequestException($"Server returned {response.StatusCode}: {responseJson}");
+        }
 
         var jsonDocument = JsonSerializer.Deserialize<JsonElement>(responseJson);
         
         if (jsonDocument.TryGetProperty("error", out var error))
         {
             var errorMessage = error.TryGetProperty("message", out var msg) ? msg.GetString() : "Unknown error";
-            throw new InvalidOperationException($"Server error: {errorMessage}");
+            var errorCode = error.TryGetProperty("code", out var code) ? code.GetInt32().ToString() : "Unknown";
+            throw new InvalidOperationException($"Server error: {errorMessage} (Code: {errorCode})");
         }
 
         if (jsonDocument.TryGetProperty("result", out var result))
@@ -75,6 +96,21 @@ public class DirectHttpMcpClient : IDisposable
     public async Task<JsonElement> ListToolsAsync()
     {
         return await SendRequestAsync("tools/list");
+    }
+
+    public async Task<JsonElement> CreateSampleAsync(string prompt, int? maxTokens = null, double? temperature = null, 
+        string[]? stopSequences = null, Dictionary<string, object?>? metadata = null)
+    {
+        var parameters = new
+        {
+            prompt = prompt,
+            maxTokens = maxTokens,
+            temperature = temperature,
+            stopSequences = stopSequences,
+            metadata = metadata
+        };
+
+        return await SendRequestAsync("sampling/createSample", parameters);
     }
 
     public async Task<JsonElement> InitializeAsync()

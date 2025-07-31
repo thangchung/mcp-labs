@@ -26,7 +26,7 @@ public class TravelAgent : AgentBase
         var steps = new[]
         {
             "Searching for flights and hotels...",
-            "Comparing prices across providers...", 
+            "Comparing prices across providers...",
             "Checking availability...",
             "Preparing booking summary..."
         };
