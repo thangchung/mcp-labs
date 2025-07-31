@@ -2,7 +2,7 @@
   "profiles": {
     "McpAgent.Client": {
       "commandName": "Project",
-      "commandLineArgs": "-ge -k AIzaSyD3UIh1UhCJx9wTEY6nq1pALfIXGqs9Uig"
+      "commandLineArgs": "-ge -k <key>"
     }
   }
 }

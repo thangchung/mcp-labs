@@ -1,9 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
-using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using System.Text.Json;
 
 namespace McpAgent.Client;
 

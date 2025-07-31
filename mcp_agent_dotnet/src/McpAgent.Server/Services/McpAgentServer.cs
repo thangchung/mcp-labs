@@ -28,13 +28,15 @@ public class McpAgentServer : IMcpAgentServerExtended
 {
     private readonly IEventStore _eventStore;
     private readonly ILogger<McpAgentServer> _logger;
+    private readonly IMcpServerClient? _mcpClient;
     private readonly ConcurrentDictionary<string, IAgentSession> _activeSessions;
     private readonly Dictionary<string, Type> _availableAgents;
 
-    public McpAgentServer(IEventStore eventStore, ILogger<McpAgentServer> logger)
+    public McpAgentServer(IEventStore eventStore, ILogger<McpAgentServer> logger, IMcpServerClient? mcpClient = null)
     {
         _eventStore = eventStore ?? throw new ArgumentNullException(nameof(eventStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _mcpClient = mcpClient; // Optional - will work with fallback if not available
         _activeSessions = new ConcurrentDictionary<string, IAgentSession>();
         _availableAgents = new Dictionary<string, Type>
         {
@@ -62,7 +64,7 @@ public class McpAgentServer : IMcpAgentServerExtended
 
         _logger.LogInformation("Creating session {SessionId} for agent type {AgentType}", sessionId, agentType);
 
-        var session = new AgentSession(sessionId, agentType, _eventStore, _logger);
+        var session = new AgentSession(sessionId, agentType, _eventStore, _logger, _mcpClient);
         await session.InitializeAsync();
 
         _activeSessions.TryAdd(sessionId, session);
@@ -90,7 +92,7 @@ public class McpAgentServer : IMcpAgentServerExtended
             {
                 _logger.LogInformation("Restoring session {SessionId} for agent type {AgentType}", sessionId, sessionStarted.AgentType);
                 
-                var restoredSession = new AgentSession(sessionId, sessionStarted.AgentType, _eventStore, _logger);
+                var restoredSession = new AgentSession(sessionId, sessionStarted.AgentType, _eventStore, _logger, _mcpClient);
                 await restoredSession.RestoreFromEventsAsync(events.Cast<IEvent>());
                 
                 _activeSessions.TryAdd(sessionId, restoredSession);
@@ -145,7 +147,7 @@ public class McpAgentServer : IMcpAgentServerExtended
             // Create agent context with required properties
             var context = new AgentContext 
             { 
-                RequestId = requestId,
+                RequestId = requestId ?? string.Empty,
                 ToolName = agentType,
                 Arguments = arguments,
                 Session = session

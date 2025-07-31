@@ -16,7 +16,7 @@ public class AgentSessionTests
         var logger = Mock.Of<ILogger<AgentSession>>();
 
         // Act
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
 
         // Assert
         Assert.Equal("test-session", session.SessionId);
@@ -31,7 +31,7 @@ public class AgentSessionTests
         // Arrange
         var mockEventStore = new Mock<IEventStore>();
         var logger = Mock.Of<ILogger<AgentSession>>();
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
 
         // Act
         await session.InitializeAsync();
@@ -48,7 +48,7 @@ public class AgentSessionTests
         // Arrange
         var mockEventStore = new Mock<IEventStore>();
         var logger = Mock.Of<ILogger<AgentSession>>();
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
 
         // Act
         await session.SendProgressNotificationAsync("token1", 50, 100, "Progress message", "request1");
@@ -64,7 +64,7 @@ public class AgentSessionTests
         // Arrange
         var mockEventStore = new Mock<IEventStore>();
         var logger = Mock.Of<ILogger<AgentSession>>();
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
 
         // Act
         await session.SendLogMessageAsync("info", "Test log", "test-logger", "request1");
@@ -80,7 +80,7 @@ public class AgentSessionTests
         // Arrange
         var mockEventStore = new Mock<IEventStore>();
         var logger = Mock.Of<ILogger<AgentSession>>();
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
 
         // Act
         var result = await session.ElicitAsync("Please confirm", null, "request1");
@@ -97,7 +97,7 @@ public class AgentSessionTests
         // Arrange
         var mockEventStore = new Mock<IEventStore>();
         var logger = Mock.Of<ILogger<AgentSession>>();
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
         var messages = new List<SamplingMessage>
         {
             new() { Role = "user", Content = new SamplingContent { Type = "text", Text = "Hello" } }
@@ -106,12 +106,12 @@ public class AgentSessionTests
         // Act
         var result = await session.CreateMessageAsync(messages, 100, "request1");
 
-        // Assert - Should return a simulated result, not null
+        // Assert - Should return a fallback result when no MCP client is available
         Assert.NotNull(result);
         Assert.Equal("assistant", result.Role);
         Assert.Equal("text", result.Content.Type);
         Assert.Contains("Hello", result.Content.Text);
-        Assert.Equal("simulated-model", result.Model);
+        Assert.Equal("fallback-model", result.Model); // Updated to match new fallback behavior
         Assert.Equal("end_turn", result.StopReason);
     }
 
@@ -121,7 +121,7 @@ public class AgentSessionTests
         // Arrange
         var mockEventStore = new Mock<IEventStore>();
         var logger = Mock.Of<ILogger<AgentSession>>();
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
         var testEvent = new SessionStartedEvent("test-session", "travel_agent", DateTimeOffset.UtcNow);
 
         // Act
@@ -137,7 +137,7 @@ public class AgentSessionTests
         // Arrange
         var mockEventStore = new Mock<IEventStore>();
         var logger = Mock.Of<ILogger<AgentSession>>();
-        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger);
+        var session = new AgentSession("test-session", "travel_agent", mockEventStore.Object, logger, null);
         
         // Initialize the session to set IsActive = true
         await session.InitializeAsync();

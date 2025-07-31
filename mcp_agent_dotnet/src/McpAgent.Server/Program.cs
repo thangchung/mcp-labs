@@ -2,16 +2,32 @@ using McpAgent.Core.Events;
 using McpAgent.Core.Agents;
 using McpAgent.EventStore;
 using McpAgent.Server.Services;
-using Microsoft.AspNetCore.Mvc;
-using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
-using System.ComponentModel;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddSingleton<IEventStore, ManagedEventStore>();
+
+// Add HTTP client for MCP communication
+builder.Services.AddHttpClient();
+
+// Add MCP client service
+//builder.Services.AddScoped<IMcpServerClient>(provider =>
+//{
+//    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+//    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+//    var configuration = provider.GetRequiredService<IConfiguration>();
+    
+//    // Get MCP client endpoint from configuration or use default
+//    var mcpClientEndpoint = configuration.GetValue<string>("McpClient:Endpoint") ?? "http://localhost:8007/mcp";
+    
+//    var httpClient = httpClientFactory.CreateClient("McpClient");
+//    httpClient.Timeout = TimeSpan.FromSeconds(30);
+    
+//    return new HttpMcpServerClient(httpClient, mcpClientEndpoint, loggerFactory);
+//});
+
 builder.Services.AddScoped<IMcpAgentServerExtended, McpAgentServer>();
 builder.Services.AddScoped<IMcpAgentServer>(provider => provider.GetRequiredService<IMcpAgentServerExtended>());
 
@@ -177,6 +193,15 @@ app.MapGet("/tools", (IMcpAgentServerExtended agentServer) =>
 });
 
 var port = args.Length > 0 && args[0] == "--port" && args.Length > 1 ? int.Parse(args[1]) : 8006;
+
+// Check if demo mode is requested
+if (args.Contains("--demo-injection"))
+{
+    Console.WriteLine("🧪 Running MCP Client Injection Demo...");
+    Console.WriteLine();
+    await McpAgent.Server.Services.McpInjectionDemo.RunDemoAsync();
+    return;
+}
 
 app.Urls.Add($"http://localhost:{port}");
 

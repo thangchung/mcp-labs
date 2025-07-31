@@ -13,15 +13,17 @@ public class AgentSession : IAgentSession
     private readonly string _agentType;
     private readonly IEventStore _eventStore;
     private readonly ILogger _logger;
+    private readonly IMcpServerClient? _mcpClient;
     private IAgent? _agent;
     private readonly List<IEvent> _sessionEvents;
 
-    public AgentSession(string sessionId, string agentType, IEventStore eventStore, ILogger logger)
+    public AgentSession(string sessionId, string agentType, IEventStore eventStore, ILogger logger, IMcpServerClient? mcpClient = null)
     {
         _sessionId = sessionId ?? throw new ArgumentNullException(nameof(sessionId));
         _agentType = agentType ?? throw new ArgumentNullException(nameof(agentType));
         _eventStore = eventStore ?? throw new ArgumentNullException(nameof(eventStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _mcpClient = mcpClient; // Optional - can work without MCP client for local operations
         _sessionEvents = new List<IEvent>();
     }
 
@@ -136,8 +138,23 @@ public class AgentSession : IAgentSession
         _logger.LogInformation("Progress notification for session {SessionId}: {Progress}/{Total} - {Message}", 
             _sessionId, progress, total, message);
         
-        // In a real implementation, this would send a progress notification to the MCP client
-        await Task.CompletedTask;
+        // Send real MCP progress notification if client is available
+        if (_mcpClient != null)
+        {
+            try
+            {
+                await _mcpClient.SendProgressNotificationAsync(progressToken, progress, total, message, relatedRequestId);
+                _logger.LogDebug("Successfully sent MCP progress notification for session {SessionId}", _sessionId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send MCP progress notification for session {SessionId}: {Message}", _sessionId, ex.Message);
+            }
+        }
+        else
+        {
+            _logger.LogDebug("No MCP client available for session {SessionId}, progress notification logged only", _sessionId);
+        }
     }
 
     /// <inheritdoc />
@@ -146,8 +163,23 @@ public class AgentSession : IAgentSession
         _logger.LogInformation("Log message for session {SessionId} [{Level}] {Logger}: {Data}", 
             _sessionId, level, logger, data);
         
-        // In a real implementation, this would send a log message to the MCP client
-        await Task.CompletedTask;
+        // Send real MCP log notification if client is available
+        if (_mcpClient != null)
+        {
+            try
+            {
+                await _mcpClient.SendLogMessageAsync(level, data, logger, relatedRequestId);
+                _logger.LogDebug("Successfully sent MCP log notification for session {SessionId}", _sessionId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send MCP log notification for session {SessionId}: {Message}", _sessionId, ex.Message);
+            }
+        }
+        else
+        {
+            _logger.LogDebug("No MCP client available for session {SessionId}, log message logged only", _sessionId);
+        }
     }
 
     /// <inheritdoc />
@@ -155,22 +187,35 @@ public class AgentSession : IAgentSession
     {
         _logger.LogInformation("Eliciting user input for session {SessionId}: {Message}", _sessionId, message);
         
-        // For now, return a simulated response
-        // In a real implementation, this would send a request to the MCP client
-        await Task.Delay(100); // Simulate network delay
+        // Send real MCP elicitation request if client is available
+        if (_mcpClient != null)
+        {
+            try
+            {
+                var result = await _mcpClient.ElicitAsync(message, requestedSchema, relatedRequestId);
+                _logger.LogInformation("Received elicitation response for session {SessionId}: {Action}", _sessionId, result?.Action);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send MCP elicitation request for session {SessionId}: {Message}", _sessionId, ex.Message);
+            }
+        }
         
-        var result = new ElicitationResult
+        // Fallback response when MCP client is unavailable
+        _logger.LogDebug("No MCP client available for session {SessionId}, returning fallback elicitation response", _sessionId);
+        
+        var fallbackResult = new ElicitationResult
         {
             Action = "input",
             Content = new Dictionary<string, object?> 
             { 
-                ["response"] = $"[Simulated user response to: {message}]" 
+                ["response"] = $"[Simulated user response to: {message}]",
+                ["source"] = "fallback"
             }
         };
         
-        _logger.LogInformation("Received elicitation response for session {SessionId}", _sessionId);
-        
-        return result;
+        return fallbackResult;
     }
 
     /// <inheritdoc />
@@ -178,26 +223,38 @@ public class AgentSession : IAgentSession
     {
         _logger.LogInformation("Creating AI message for session {SessionId} with {MessageCount} messages", _sessionId, messages.Count());
         
-        // For now, return a simulated AI response
-        // In a real implementation, this would use the MCP sampling capability
-        await Task.Delay(200); // Simulate AI processing delay
+        // Send real MCP sampling request if client is available
+        if (_mcpClient != null)
+        {
+            try
+            {
+                var result = await _mcpClient.CreateMessageAsync(messages, maxTokens, relatedRequestId);
+                _logger.LogInformation("Received AI message for session {SessionId} from model: {Model}", _sessionId, result?.Model);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send MCP sampling request for session {SessionId}: {Message}", _sessionId, ex.Message);
+            }
+        }
+        
+        // Fallback response when MCP client is unavailable
+        _logger.LogDebug("No MCP client available for session {SessionId}, returning fallback AI response", _sessionId);
         
         var lastMessage = messages.LastOrDefault();
-        var result = new SamplingResult
+        var fallbackResult = new SamplingResult
         {
             Role = "assistant",
             Content = new SamplingContent 
             { 
                 Type = "text", 
-                Text = $"[AI Response based on: {lastMessage?.Content?.Text ?? "conversation"}]" 
+                Text = $"I apologize, but I'm currently unable to process your request due to a temporary connection issue. Your message: '{lastMessage?.Content?.Text ?? "conversation"}' has been noted." 
             },
-            Model = "simulated-model",
+            Model = "fallback-model",
             StopReason = "end_turn"
         };
         
-        _logger.LogInformation("Generated AI message for session {SessionId}", _sessionId);
-        
-        return result;
+        return fallbackResult;
     }
 
     private IAgent CreateAgent(string agentType)
