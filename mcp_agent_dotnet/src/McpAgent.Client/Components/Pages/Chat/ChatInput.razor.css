@@ -1,0 +1,154 @@
+/* Modern Input Box Design */
+.input-box {
+    display: flex; 
+    flex-direction: column; 
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    border-radius: 20px;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem auto;
+    max-width: 900px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    position: sticky;
+    bottom: 1.5rem;
+    z-index: 50;
+}
+
+.input-box:focus-within {
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 
+        0 0 0 3px rgba(59, 130, 246, 0.1),
+        0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(-2px);
+}
+
+textarea {
+    resize: none;
+    border: none;
+    outline: none;
+    flex-grow: 1;
+    background: transparent;
+    color: #f8fafc;
+    font-size: 1rem;
+    line-height: 1.6;
+    min-height: 24px;
+    max-height: 120px;
+    font-family: inherit;
+    padding: 0;
+}
+
+textarea::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+}
+
+textarea:placeholder-shown + .tools {
+    --send-button-color: #64748b;
+}
+
+.tools {
+    display: flex; 
+    margin-top: 1rem; 
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.tool-icon {
+    width: 1.375rem;
+    height: 1.375rem;
+    transition: all 0.2s ease;
+}
+
+.send-button {
+    color: var(--send-button-color, #3b82f6);
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border: none;
+    cursor: pointer;
+    padding: 0.75rem;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.send-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.send-button:hover::before {
+    left: 100%;
+}
+
+.send-button:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(59, 130, 246, 0.25);
+}
+
+.send-button:active {
+    transform: translateY(-1px) scale(1.02);
+}
+
+.send-button .tool-icon {
+    color: white;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .input-box {
+        margin: 1rem 0.75rem;
+        padding: 0.875rem 1rem;
+        border-radius: 16px;
+        bottom: 1rem;
+    }
+    
+    textarea {
+        font-size: 0.9rem;
+    }
+    
+    .tools {
+        margin-top: 0.75rem;
+    }
+    
+    .send-button {
+        padding: 0.625rem;
+    }
+    
+    .tool-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .input-box {
+        margin: 1rem 0.5rem;
+        padding: 0.75rem;
+        border-radius: 14px;
+        bottom: 0.75rem;
+    }
+    
+    .send-button {
+        padding: 0.5rem;
+    }
+    
+    .tool-icon {
+        width: 1.125rem;
+        height: 1.125rem;
+    }
+}

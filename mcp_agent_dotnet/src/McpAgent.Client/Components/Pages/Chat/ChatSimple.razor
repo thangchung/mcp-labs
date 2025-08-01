@@ -1,0 +1,375 @@
+@page "/chat-simple"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using McpAgent.Client.Services
+@using Microsoft.Extensions.AI
+@inject McpIntegratedChatService McpService
+@inject ILogger<ChatSimple> Logger
+@implements IDisposable
+
+<PageTitle>MCP Agent Simple Chat</PageTitle>
+
+<div class="main-background-gradient">
+    <div class="chat-header mb-3">
+        <h2>MCP Agent Simple Chat</h2>
+        <div>
+            Status: 
+            <span class="badge @(isInitialized ? "badge-success" : "badge-warning")">
+                @(isInitialized ? "Ready" : "Initializing")
+            </span>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fas fa-exclamation-triangle me-2"></i>@errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => errorMessage = string.Empty)"></button>
+        </div>
+    }
+
+    <div class="quick-actions mb-3">
+        <button class="btn btn-primary me-2" @onclick="@TestTravelAction" disabled="@isLoading">
+            <i class="fas fa-plane"></i> @(isLoading ? "Processing..." : "Travel to Tokyo")
+        </button>
+        <button class="btn btn-success" @onclick="@TestResearchAction" disabled="@isLoading">
+            <i class="fas fa-search"></i> @(isLoading ? "Processing..." : "Research AI")
+        </button>
+    </div>
+
+    <div class="form-group mb-3">
+        <label class="form-label">Custom Message:</label>
+        <div class="input-group">
+            <input @bind="customMessage" @onkeypress="@HandleKeyPress" class="form-control" placeholder="Type your message here..." />
+            <button @onclick="@SendCustomMessage" disabled="@(isLoading || string.IsNullOrWhiteSpace(customMessage))" class="btn btn-outline-light">
+                <i class="fas fa-paper-plane"></i> Send
+            </button>
+        </div>
+    </div>
+
+    <div class="messages-container">
+        <div class="messages-header">
+            <h5>Messages (@messages.Count)</h5>
+            <button class="btn btn-sm btn-outline-light" @onclick="@ClearMessages">
+                <i class="fas fa-trash"></i> Clear
+            </button>
+        </div>
+        
+        <div class="messages-list">
+            @if (!messages.Any())
+            {
+                <div class="no-messages">
+                    <i class="fas fa-comments"></i>
+                    <p>No messages yet. Try one of the action buttons above!</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var message in messages)
+                {
+                    <div class="message-item @(message.IsUser ? "user-message" : "system-message")">
+                        <div class="message-header">
+                            <span class="message-type">@(message.IsUser ? "You" : "System")</span>
+                            <span class="message-time">@message.Timestamp.ToString("HH:mm:ss")</span>
+                        </div>
+                        <div class="message-content">@message.Content</div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ChatMessageItem> messages = new();
+    private string customMessage = string.Empty;
+    private string errorMessage = string.Empty;
+    private bool isLoading = false;
+    private bool isInitialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Logger.LogInformation("🔄 Initializing Simple Chat component...");
+            
+            // Initialize MCP service
+            await McpService.InitializeAsync();
+            isInitialized = true;
+            
+            AddMessage("System initialized and ready!", false);
+            Logger.LogInformation("✅ Simple Chat component initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Failed to initialize Simple Chat component");
+            errorMessage = $"Initialization failed: {ex.Message}";
+        }
+    }
+
+    private async Task TestTravelAction()
+    {
+        await ProcessAction("Travel to Tokyo", "🛫 Planning your trip to Tokyo...");
+    }
+
+    private async Task TestResearchAction()
+    {
+        await ProcessAction("Research the latest developments in AI", "🔍 Researching AI developments...");
+    }
+
+    private async Task SendCustomMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(customMessage))
+        {
+            var message = customMessage;
+            customMessage = string.Empty; // Clear input immediately
+            await ProcessAction(message, $"💭 Processing: {message}");
+        }
+    }
+
+    private async Task ProcessAction(string request, string processingMessage)
+    {
+        if (isLoading) return;
+
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            
+            // Add user message
+            AddMessage(request, true);
+            
+            // Add processing message
+            AddMessage(processingMessage, false);
+            StateHasChanged();
+
+            // Simulate processing (in real implementation, call MCP service)
+            await Task.Delay(1000); // Simulate network delay
+            
+            // Generate response
+            var response = await GenerateResponse(request);
+            AddMessage(response, false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Failed to process action: {Request}", request);
+            errorMessage = $"Failed to process request: {ex.Message}";
+            AddMessage($"❌ Error: {ex.Message}", false);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<string> GenerateResponse(string request)
+    {
+        try
+        {
+            // For demo purposes, generate a mock response
+            // In real implementation, you would call the MCP service here
+            
+            if (request.ToLower().Contains("tokyo"))
+            {
+                await Task.Delay(500); // Simulate API call
+                return "✈️ I've found great travel options for Tokyo! Here are some recommendations:\n" +
+                       "🏨 Hotels: Imperial Hotel, Park Hyatt Tokyo\n" +
+                       "🍜 Food: Try Tsukiji Fish Market, Shibuya restaurants\n" +
+                       "🎌 Attractions: Tokyo Tower, Senso-ji Temple, Meiji Shrine\n" +
+                       "📅 Best time to visit: Spring (cherry blossoms) or Fall";
+            }
+            else if (request.ToLower().Contains("ai"))
+            {
+                await Task.Delay(800); // Simulate API call
+                return "🤖 Latest AI developments include:\n" +
+                       "🧠 Large Language Models: GPT-4, Claude, Gemini advancements\n" +
+                       "🎨 Generative AI: DALL-E 3, Midjourney, Stable Diffusion improvements\n" +
+                       "🔬 Research: Multimodal AI, reasoning capabilities, efficiency improvements\n" +
+                       "🏭 Applications: AI agents, code generation, scientific research";
+            }
+            else
+            {
+                await Task.Delay(300); // Simulate API call
+                return $"💡 I received your message: \"{request}\"\n" +
+                       "This is a demo response. In a full implementation, I would use MCP tools to provide more specific assistance.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to generate response");
+            return $"❌ Sorry, I encountered an error generating a response: {ex.Message}";
+        }
+    }
+
+    private void AddMessage(string content, bool isUser)
+    {
+        messages.Add(new ChatMessageItem
+        {
+            Content = content,
+            IsUser = isUser,
+            Timestamp = DateTime.Now
+        });
+        
+        // Keep only last 50 messages to prevent memory issues
+        if (messages.Count > 50)
+        {
+            messages.RemoveAt(0);
+        }
+    }
+
+    private void ClearMessages()
+    {
+        messages.Clear();
+        AddMessage("Messages cleared.", false);
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isLoading && !string.IsNullOrWhiteSpace(customMessage))
+        {
+            await SendCustomMessage();
+        }
+    }
+
+    public void Dispose()
+    {
+        // Clean up any resources if needed
+    }
+
+    private class ChatMessageItem
+    {
+        public string Content { get; set; } = string.Empty;
+        public bool IsUser { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+}
+
+<style>
+    .main-background-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: white;
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+        margin-bottom: 20px;
+    }
+
+    .badge-success {
+        background-color: #28a745;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.875rem;
+    }
+
+    .badge-warning {
+        background-color: #ffc107;
+        color: black;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.875rem;
+    }
+
+    .quick-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .messages-container {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 15px;
+        backdrop-filter: blur(10px);
+        max-height: 500px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .messages-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .messages-list {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 400px;
+    }
+
+    .message-item {
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 8px;
+        word-wrap: break-word;
+    }
+
+    .user-message {
+        background: rgba(0, 123, 255, 0.3);
+        margin-left: 20px;
+    }
+
+    .system-message {
+        background: rgba(40, 167, 69, 0.3);
+        margin-right: 20px;
+    }
+
+    .message-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        margin-bottom: 5px;
+        opacity: 0.8;
+    }
+
+    .message-content {
+        white-space: pre-line;
+        line-height: 1.4;
+    }
+
+    .no-messages {
+        text-align: center;
+        padding: 40px 20px;
+        opacity: 0.7;
+    }
+
+    .no-messages i {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+
+    .form-control {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+    }
+
+    .form-control::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .form-control:focus {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: white;
+        box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-outline-light:disabled {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.5);
+    }
+</style>

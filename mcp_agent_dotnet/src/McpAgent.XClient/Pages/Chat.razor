@@ -1,0 +1,352 @@
+@page "/chat"
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>MCP Agent SignalR Chat</PageTitle>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h1 class="chat-title">MCP Agent SignalR Chat</h1>
+        <div class="connection-status">
+            <span>Connection Status:</span>
+            <span class="@(IsConnected ? "status-connected" : "status-disconnected")">
+                @(IsConnected ? "Connected" : "Disconnected")
+            </span>
+        </div>
+    </div>
+
+    <div class="chat-content">
+        <div class="messages-section">
+            <div class="messages-container" id="messagesList">
+                @if (messages.Count == 0)
+                {
+                    <div class="welcome-message">
+                        <p>17:49:31 - System: Connected to SignalR Hub</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var message in messages)
+                    {
+                        <div class="message">
+                            <small class="message-time">@DateTime.Now.ToString("HH:mm:ss")</small>
+                            <div class="message-content">@message</div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="input-section">
+            <div class="user-input">
+                <label for="userInput">User:</label>
+                <input @bind="userInput" id="userInput" class="form-control user-field" placeholder="User" />
+            </div>
+            
+            <div class="message-input">
+                <label for="messageInput">Message:</label>
+                <textarea @bind="messageInput" id="messageInput" class="form-control message-field" 
+                          placeholder="Type your message..." @onkeypress="HandleKeyPress"></textarea>
+            </div>
+
+            <div class="action-buttons">
+                <button @onclick="Send" disabled="@(!IsConnected)" class="btn btn-primary send-btn">
+                    Send Message
+                </button>
+                
+                <button @onclick="TravelToTokyo" disabled="@(!IsConnected)" class="btn btn-success travel-btn">
+                    ✈️ Travel to Tokyo
+                </button>
+                
+                <button @onclick="ResearchAI" disabled="@(!IsConnected)" class="btn btn-info research-btn">
+                    🔍 Research AI
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .chat-container {
+        background: linear-gradient(135deg, #667add 0%, #9c88ff 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: white;
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .chat-title {
+        font-size: 2.5rem;
+        font-weight: 300;
+        margin: 0;
+    }
+
+    .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1rem;
+    }
+
+    .status-connected {
+        background: #28a745;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .status-disconnected {
+        background: #dc3545;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .chat-content {
+        display: flex;
+        gap: 20px;
+        height: calc(100vh - 200px);
+    }
+
+    .messages-section {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 20px;
+        backdrop-filter: blur(10px);
+    }
+
+    .messages-container {
+        height: 100%;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+
+    .welcome-message {
+        opacity: 0.8;
+        font-style: italic;
+    }
+
+    .message {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+
+    .message-time {
+        opacity: 0.7;
+        font-size: 0.85rem;
+    }
+
+    .message-content {
+        margin-top: 5px;
+        line-height: 1.4;
+    }
+
+    .input-section {
+        width: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .user-input, .message-input {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .user-input label, .message-input label {
+        font-weight: 500;
+        font-size: 1rem;
+    }
+
+    .form-control {
+        background: rgba(255, 255, 255, 0.9);
+        border: none;
+        border-radius: 10px;
+        padding: 12px;
+        color: #333;
+        font-size: 1rem;
+    }
+
+    .user-field {
+        height: 45px;
+    }
+
+    .message-field {
+        height: 80px;
+        resize: vertical;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .btn {
+        padding: 15px 20px;
+        border: none;
+        border-radius: 25px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .send-btn {
+        background: #007bff;
+        color: white;
+    }
+
+    .send-btn:hover:not(:disabled) {
+        background: #0056b3;
+        transform: translateY(-2px);
+    }
+
+    .travel-btn {
+        background: #28a745;
+        color: white;
+    }
+
+    .travel-btn:hover:not(:disabled) {
+        background: #1e7e34;
+        transform: translateY(-2px);
+    }
+
+    .research-btn {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .research-btn:hover:not(:disabled) {
+        background: #117a8b;
+        transform: translateY(-2px);
+    }
+
+    /* Scrollbar styling */
+    .messages-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .messages-container::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+    }
+
+    .messages-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 3px;
+    }
+
+    .messages-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.5);
+    }
+</style>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<string> messages = [];
+    private string? userInput;
+    private string? messageInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/chathub"))
+            .Build();
+
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodedMsg = $"{user}: {message}";
+            messages.Add(encodedMsg);
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("ReceiveStatus", (status) => {
+            messages.Add($"System: {status}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("ReceiveTravelResponse", (response) => {
+            messages.Add($"Travel Agent: {response}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("ReceiveResearchResponse", (response) => {
+            messages.Add($"Research Agent: {response}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task Send()
+    {
+        if (hubConnection is not null && !string.IsNullOrWhiteSpace(userInput) && !string.IsNullOrWhiteSpace(messageInput))
+        {
+            await hubConnection.SendAsync("SendMessage", userInput, messageInput);
+            messageInput = string.Empty; // Clear the message input after sending
+        }
+    }
+
+    private async Task TravelToTokyo()
+    {
+        if (hubConnection is not null)
+        {
+            var user = string.IsNullOrWhiteSpace(userInput) ? "User" : userInput;
+            var destination = "Tokyo";
+            messages.Add($"You: Travel to Tokyo request");
+            await hubConnection.SendAsync("ExecuteTravelAgent", user, destination);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ResearchAI()
+    {
+        if (hubConnection is not null)
+        {
+            var user = string.IsNullOrWhiteSpace(userInput) ? "User" : userInput;
+            var topic = "Research the latest developments in Artificial Intelligence, including recent breakthroughs and trends.";
+            messages.Add($"You: Research AI request");
+            await hubConnection.SendAsync("ExecuteResearchAgent", user, topic);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await Send();
+        }
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

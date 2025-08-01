@@ -1,0 +1,61 @@
+@inherits LayoutComponentBase
+
+<div class="app">
+    <header class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-robot"></i> MCP Agent
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <nav class="navbar-nav ms-auto">
+                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                        <i class="fas fa-home"></i> Home
+                    </NavLink>
+                    <NavLink class="nav-link" href="/chat-simple">
+                        <i class="fas fa-comments"></i> Simple Chat
+                    </NavLink>
+                    <NavLink class="nav-link" href="/chat-signalr">
+                        <i class="fas fa-signal"></i> SignalR Chat
+                    </NavLink>
+                    <NavLink class="nav-link" href="/chat">
+                        <i class="fas fa-robot"></i> Original Chat
+                    </NavLink>
+                </nav>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container my-4">
+        @Body
+    </main>
+</div>
+
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --background-gradient: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--background-gradient);
+        min-height: 100vh;
+    }
+
+    .app {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    main {
+        flex: 1;
+    }
+</style>

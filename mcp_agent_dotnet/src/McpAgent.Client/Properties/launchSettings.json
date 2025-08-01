@@ -1,8 +1,52 @@
 {
+  "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "McpAgent.Client": {
+    "McpAgent.Client (Console)": {
       "commandName": "Project",
-      "commandLineArgs": "-ge -k <key>"
+      "commandLineArgs": "-ge -k <key>",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "McpAgent.Client (Blazor)": {
+      "commandName": "Project",
+      "commandLineArgs": "--blazor --port 8007",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:8007",
+      "applicationUrl": "http://localhost:8007",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:8007"
+      }
+    },
+    "McpAgent.Client (Host)": {
+      "commandName": "Project",
+      "commandLineArgs": "--host --port 8007",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:8007",
+      "applicationUrl": "http://localhost:8007",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:8007"
+      }
+    },
+    "IIS Express (Blazor)": {
+      "commandName": "IISExpress",
+      "commandLineArgs": "--blazor",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  },
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:8007",
+      "sslPort": 0
     }
   }
 }

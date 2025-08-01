@@ -1,0 +1,58 @@
+@using Microsoft.Extensions.AI
+
+<div class="message @GetMessageClass()">
+    <div class="message-content">
+        @if (Message.Role == ChatRole.User)
+        {
+            <div class="user-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+        }
+        else
+        {
+            <div class="assistant-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+        }
+        
+        <div class="message-text">
+            @if (InProgress)
+            {
+                <div class="typing-indicator">
+                    @GetMessageText()
+                    <span class="cursor">|</span>
+                </div>
+            }
+            else
+            {
+                @GetMessageText()
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public required ChatMessage Message { get; set; }
+
+    [Parameter]
+    public bool InProgress { get; set; }
+
+    private string GetMessageClass()
+    {
+        var baseClass = Message.Role == ChatRole.User ? "user-message" : "assistant-message";
+        return InProgress ? $"{baseClass} in-progress" : baseClass;
+    }
+
+    private string GetMessageText()
+    {
+        // Microsoft.Extensions.AI ChatMessage typically has Text property or Contents
+        return Message.Text ?? string.Empty;
+    }
+
+    public static void NotifyChanged(ChatMessage message)
+    {
+        // This would typically trigger a StateHasChanged in the parent component
+        // For now, we'll rely on the parent component to handle updates
+    }
+}

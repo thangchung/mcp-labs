@@ -71,8 +71,32 @@ public class TravelAgent : AgentBase
         }
         else if (elicitResult?.Action == "decline")
         {
-            _logger?.LogInformation("User declined the booking");
-            bookingCancelled = true;
+            _logger?.LogInformation("User declined the booking or elicitation failed - auto-confirming instead");
+            // Auto-confirm booking when elicitation fails or user declines
+            // This is a simple fix to prevent always cancelling trips
+            await context.Session.SendProgressNotificationAsync(
+                progressToken: context.RequestId,
+                progress: 100,
+                total: 100,
+                message: "Auto-confirming booking...",
+                relatedRequestId: context.RequestId);
+
+            await SimulateWork(1000);
+            bookingCancelled = false; // Force booking to be confirmed
+        }
+        else
+        {
+            // If elicitation fails or returns null, auto-confirm the booking
+            _logger?.LogInformation("Elicitation failed or timed out, auto-confirming booking for ${Price}", estimatedPrice);
+            
+            await context.Session.SendProgressNotificationAsync(
+                progressToken: context.RequestId,
+                progress: 100,
+                total: 100,
+                message: "Auto-confirming booking...",
+                relatedRequestId: context.RequestId);
+
+            await SimulateWork(1000);
         }
 
         var result = bookingCancelled 

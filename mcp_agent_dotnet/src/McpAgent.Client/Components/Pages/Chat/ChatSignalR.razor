@@ -1,0 +1,219 @@
+@page "/chat-signalr"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>MCP Agent SignalR Chat</PageTitle>
+
+<div class="main-background-gradient">
+    <div class="chat-header mb-3">
+        <h2>MCP Agent SignalR Chat</h2>
+        <div>
+            Connection Status: 
+            <span class="badge @(IsConnected ? "badge-success" : "badge-danger")">
+                @(IsConnected ? "Connected" : "Disconnected")
+            </span>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fas fa-exclamation-triangle me-2"></i>@errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => errorMessage = string.Empty)"></button>
+        </div>
+    }
+
+    <div class="form-group mb-3">
+        <label>
+            User:
+            <input @bind="userInput" class="form-control" />
+        </label>
+    </div>
+    <div class="form-group mb-3">
+        <label>
+            Message:
+            <input @bind="messageInput" class="form-control" size="50" />
+        </label>
+    </div>
+    <button @onclick="Send" disabled="@(!IsConnected)" class="btn btn-primary me-2">Send Message</button>
+    <button @onclick="TestMcpMessage" disabled="@(!IsConnected)" class="btn btn-success">Test MCP Message</button>
+
+    <hr>
+
+    <div class="messages-container">
+        <ul id="messagesList" class="list-unstyled">
+            @foreach (var message in messages)
+            {
+                <li class="message-item">@message</li>
+            }
+        </ul>
+    </div>
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<string> messages = [];
+    private string? userInput = "User";
+    private string? messageInput;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Build SignalR connection to the MCP notification hub
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/mcpHub"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Subscribe to incoming messages
+            hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+            {
+                var encodedMsg = $"{DateTime.Now:HH:mm:ss} - {user}: {message}";
+                messages.Add(encodedMsg);
+                InvokeAsync(StateHasChanged);
+            });
+
+            // Subscribe to MCP notifications
+            hubConnection.On<string>("McpNotification", (notification) =>
+            {
+                var encodedMsg = $"{DateTime.Now:HH:mm:ss} - MCP: {notification}";
+                messages.Add(encodedMsg);
+                InvokeAsync(StateHasChanged);
+            });
+
+            // Handle connection events
+            hubConnection.Reconnecting += (error) =>
+            {
+                errorMessage = $"Connection lost. Reconnecting... {error?.Message}";
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            hubConnection.Reconnected += (connectionId) =>
+            {
+                errorMessage = string.Empty;
+                messages.Add($"{DateTime.Now:HH:mm:ss} - System: Reconnected to SignalR");
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            hubConnection.Closed += (error) =>
+            {
+                errorMessage = $"Connection closed. {error?.Message}";
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            // Start the connection
+            await hubConnection.StartAsync();
+            messages.Add($"{DateTime.Now:HH:mm:ss} - System: Connected to SignalR Hub");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to connect to SignalR: {ex.Message}";
+        }
+    }
+
+    private async Task Send()
+    {
+        if (hubConnection is not null && !string.IsNullOrWhiteSpace(messageInput))
+        {
+            try
+            {
+                await hubConnection.SendAsync("SendMessage", userInput, messageInput);
+                messageInput = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Failed to send message: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task TestMcpMessage()
+    {
+        if (hubConnection is not null)
+        {
+            try
+            {
+                await hubConnection.SendAsync("TriggerMcpAction", "test_travel_request", "Travel to Tokyo");
+                messages.Add($"{DateTime.Now:HH:mm:ss} - System: Triggered MCP test action");
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Failed to trigger MCP action: {ex.Message}";
+            }
+        }
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .main-background-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: white;
+    }
+
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+    }
+
+    .badge-success {
+        background-color: #28a745;
+    }
+
+    .badge-danger {
+        background-color: #dc3545;
+    }
+
+    .messages-container {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+        backdrop-filter: blur(10px);
+    }
+
+    .message-item {
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .message-item:last-child {
+        border-bottom: none;
+    }
+
+    .form-control {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+    }
+
+    .form-control::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+    }
+</style>

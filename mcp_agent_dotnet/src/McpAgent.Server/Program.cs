@@ -13,20 +13,20 @@ builder.Services.AddSingleton<IEventStore, ManagedEventStore>();
 builder.Services.AddHttpClient();
 
 // Add MCP client service
-//builder.Services.AddScoped<IMcpServerClient>(provider =>
-//{
-//    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
-//    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-//    var configuration = provider.GetRequiredService<IConfiguration>();
+builder.Services.AddScoped<IMcpServerClient>(provider =>
+{
+    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+    var configuration = provider.GetRequiredService<IConfiguration>();
     
-//    // Get MCP client endpoint from configuration or use default
-//    var mcpClientEndpoint = configuration.GetValue<string>("McpClient:Endpoint") ?? "http://localhost:8007/mcp";
+    // Get MCP client endpoint from configuration or use default
+    var mcpClientEndpoint = configuration.GetValue<string>("McpClient:Endpoint") ?? "http://localhost:8007/mcp";
     
-//    var httpClient = httpClientFactory.CreateClient("McpClient");
-//    httpClient.Timeout = TimeSpan.FromSeconds(30);
+    var httpClient = httpClientFactory.CreateClient("McpClient");
+    httpClient.Timeout = TimeSpan.FromSeconds(30);
     
-//    return new HttpMcpServerClient(httpClient, mcpClientEndpoint, loggerFactory);
-//});
+    return new HttpMcpServerClient(httpClient, mcpClientEndpoint, loggerFactory);
+});
 
 builder.Services.AddScoped<IMcpAgentServerExtended, McpAgentServer>();
 builder.Services.AddScoped<IMcpAgentServer>(provider => provider.GetRequiredService<IMcpAgentServerExtended>());

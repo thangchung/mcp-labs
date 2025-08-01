@@ -1,0 +1,95 @@
+@page "/"
+
+<PageTitle>MCP Agent - Home</PageTitle>
+
+<div class="hero-section text-center mb-5">
+    <h1 class="display-4">
+        <i class="fas fa-robot text-primary"></i> MCP Agent Demo
+    </h1>
+    <p class="lead">Multiple Chat Protocol (MCP) integration with Blazor and SignalR</p>
+    <p class="text-muted">Choose from different chat implementations to explore MCP capabilities</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card h-100 shadow">
+            <div class="card-body text-center">
+                <i class="fas fa-comments fa-3x text-success mb-3"></i>
+                <h5 class="card-title">Simple Chat</h5>
+                <p class="card-text">Direct HTTP-based chat interface with MCP integration. Most reliable approach.</p>
+                <a href="/chat-simple" class="btn btn-success">
+                    <i class="fas fa-arrow-right"></i> Try Simple Chat
+                </a>
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">✅ Direct service calls, ✅ Working MCP actions</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow">
+            <div class="card-body text-center">
+                <i class="fas fa-signal fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">SignalR WebAssembly Chat</h5>
+                <p class="card-text">Real-time chat using WebAssembly and SignalR following official 8.0 patterns.</p>
+                <a href="/chat-signalr" class="btn btn-primary">
+                    <i class="fas fa-arrow-right"></i> Try SignalR Chat
+                </a>
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">🚀 Real-time, 🔄 WebAssembly, ⚡ SignalR</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow">
+            <div class="card-body text-center">
+                <i class="fas fa-robot fa-3x text-warning mb-3"></i>
+                <h5 class="card-title">Original Chat</h5>
+                <p class="card-text">Original implementation with streaming capabilities and advanced features.</p>
+                <a href="/chat" class="btn btn-warning">
+                    <i class="fas fa-arrow-right"></i> Try Original Chat
+                </a>
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">🔧 Advanced features, 📡 Streaming responses</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5><i class="fas fa-info-circle"></i> About This Demo</h5>
+                <p>This demonstration showcases different approaches to integrating Multiple Chat Protocol (MCP) with Blazor applications:</p>
+                <ul>
+                    <li><strong>Simple Chat:</strong> Uses direct HTTP calls to MCP services - most reliable</li>
+                    <li><strong>SignalR WebAssembly:</strong> Follows the official .NET 8.0 BlazorSignalRApp pattern</li>
+                    <li><strong>Original Chat:</strong> Advanced implementation with streaming and real-time features</li>
+                </ul>
+                <p>All implementations connect to the same MCP server running on port 8006 with travel_agent and research_agent tools.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hero-section {
+        padding: 3rem 0;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .card {
+        transition: transform 0.2s;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+    }
+</style>

@@ -1,0 +1,151 @@
+@page "/chat-signalr-server"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>MCP Agent Chat - SignalR Server</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="fas fa-comments"></i> MCP Agent Chat with SignalR</h2>
+            <p class="text-muted">Real-time chat interface using Blazor Server and SignalR</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Chat Messages</span>
+                    <span class="badge @(IsConnected ? "bg-success" : "bg-danger")">
+                        @(IsConnected ? "Connected" : "Disconnected")
+                    </span>
+                </div>
+                <div class="card-body" style="height: 400px; overflow-y: auto;">
+                    <div id="messagesList">
+                        @foreach (var message in messages)
+                        {
+                            <div class="mb-2 p-2 border-bottom">
+                                @message
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <input @bind="userInput" placeholder="Your name" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <input @bind="messageInput" @onkeypress="HandleKeyPress" placeholder="Type a message..." class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <button @onclick="Send" disabled="@(!IsConnected)" class="btn btn-primary w-100">
+                                <i class="fas fa-paper-plane"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-robot"></i> MCP Agent Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button @onclick="TravelToTokyo" disabled="@(!IsConnected)" class="btn btn-success">
+                            <i class="fas fa-plane"></i> Travel to Tokyo
+                        </button>
+                        <button @onclick="ResearchAI" disabled="@(!IsConnected)" class="btn btn-info">
+                            <i class="fas fa-search"></i> Research AI
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<string> messages = [];
+    private string? userInput = "MCP Agent";
+    private string? messageInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/mcpHub"))
+            .Build();
+
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodedMsg = $"{user}: {message}";
+            messages.Add(encodedMsg);
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            await hubConnection.StartAsync();
+            messages.Add("System: Connected to MCP SignalR Hub");
+        }
+        catch (Exception ex)
+        {
+            messages.Add($"System Error: Failed to connect - {ex.Message}");
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task Send()
+    {
+        if (hubConnection is not null && !string.IsNullOrWhiteSpace(messageInput))
+        {
+            await hubConnection.SendAsync("SendMessage", userInput ?? "Anonymous", messageInput);
+            messageInput = "";
+        }
+    }
+
+    private async Task TravelToTokyo()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("SendMessage", "MCP Agent", "🌟 Initiating travel planning to Tokyo...");
+            await hubConnection.SendAsync("TriggerMcpAction", "travel_agent", "Plan a comprehensive 7-day itinerary for Tokyo including must-visit places, local cuisine, and cultural experiences.");
+        }
+    }
+
+    private async Task ResearchAI()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("SendMessage", "MCP Agent", "🔍 Starting AI research...");
+            await hubConnection.SendAsync("TriggerMcpAction", "research_agent", "Research the latest developments in Large Language Models and their applications in 2024.");
+        }
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Send();
+        }
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

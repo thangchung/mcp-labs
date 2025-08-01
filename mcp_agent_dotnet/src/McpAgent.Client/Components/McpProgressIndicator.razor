@@ -1,0 +1,121 @@
+@using Microsoft.AspNetCore.SignalR.Client
+@using McpAgent.Client.Models
+@implements IAsyncDisposable
+@inject NavigationManager Navigation
+
+<div class="mcp-progress-container">
+    @if (IsVisible)
+    {
+        <div class="progress-card">
+            <div class="progress-header">
+                <h5>@CurrentMessage</h5>
+                <small class="text-muted">@Progress/@Total</small>
+            </div>
+            <div class="progress mb-2">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" 
+                     style="width: @(Percentage)%" 
+                     aria-valuenow="@Progress" 
+                     aria-valuemin="0" 
+                     aria-valuemax="@Total">
+                    @(Percentage)%
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(LastLogMessage))
+            {
+                <small class="text-info">@LastLogMessage</small>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private bool IsVisible = false;
+    private int Progress = 0;
+    private int Total = 100;
+    private string CurrentMessage = "";
+    private string LastLogMessage = "";
+    private int Percentage => Total > 0 ? (Progress * 100) / Total : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/mcpHub"))
+            .Build();
+
+        hubConnection.On<McpProgressNotification>("ProgressUpdate", (notification) =>
+        {
+            Progress = notification.Progress;
+            Total = notification.Total;
+            CurrentMessage = notification.Message;
+            IsVisible = true;
+            
+            // Auto-hide after completion
+            if (Progress >= Total)
+            {
+                _ = Task.Delay(3000).ContinueWith(_ => 
+                {
+                    IsVisible = false;
+                    InvokeAsync(StateHasChanged);
+                });
+            }
+            
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<McpLogNotification>("LogUpdate", (notification) =>
+        {
+            LastLogMessage = $"[{notification.Level}] {notification.Message}";
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .mcp-progress-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+        max-width: 350px;
+    }
+
+    .progress-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .progress-header h5 {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    .progress {
+        height: 20px;
+    }
+
+    .progress-bar {
+        transition: width 0.3s ease;
+    }
+</style>

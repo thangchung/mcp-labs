@@ -1,0 +1,389 @@
+@page "/chat"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Microsoft.Extensions.AI
+@using Microsoft.Extensions.Logging
+@using McpAgent.Client.Services
+@using McpAgent.Client.Components.Pages.Chat
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JS
+@inject ILogger<Chat> Logger
+@inject McpIntegratedChatService McpService
+@implements IDisposable
+
+<PageTitle>MCP Agent Chat</PageTitle>
+
+<div class="main-background-gradient">
+    <ChatHeader OnNewChat="@ResetConversationAsync" />
+
+    <div class="navigation-links mb-3">
+        <a href="/chat-signalr" class="btn btn-outline-light btn-sm me-2">
+            <i class="fas fa-broadcast-tower"></i> SignalR Chat
+        </a>
+        <a href="/chat-simple" class="btn btn-outline-light btn-sm">
+            <i class="fas fa-comments"></i> Simple Chat (Recommended)
+        </a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="error-container">
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-triangle me-2"></i>@errorMessage
+                <button type="button" class="btn-close" @onclick="@(() => errorMessage = string.Empty)"></button>
+            </div>
+        </div>
+    }
+    
+    @if (!isInitialized)
+    {
+        <div class="loading-container">
+            <div class="alert alert-info">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Initializing MCP connection...
+            </div>
+        </div>
+    }
+
+    <ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
+        <NoMessagesContent>
+            <div class="welcome-section">
+                <h3>Welcome to MCP Agent Chat</h3>
+                <p>Start chatting with your AI assistant powered by MCP tools!</p>
+                <div class="quick-actions">
+                    <button class="btn btn-primary me-2" @onclick="@TestTravelButton" disabled="@isLoading">
+                        <i class="fas fa-plane"></i> Travel to Tokyo
+                    </button>
+                    <button class="btn btn-secondary" @onclick="@TestResearchButton" disabled="@isLoading">
+                        <i class="fas fa-search"></i> Research AI
+                    </button>
+                </div>
+            </div>
+        </NoMessagesContent>
+    </ChatMessageList>
+
+    <ChatInput @ref="chatInput" OnSend="@SendMessageAsync" />
+
+@if (!string.IsNullOrEmpty(notificationMessage))
+{
+    <div class="notification-container">
+        <div class="alert alert-warning alert-dismissible fade show">
+            <i class="fas fa-bell me-2"></i>@notificationMessage
+            <button type="button" class="btn-close" @onclick="@(() => notificationMessage = string.Empty)"></button>
+        </div>
+    </div>
+}
+
+</div> <!-- End main-background-gradient -->
+
+@code {
+    private readonly List<ChatMessage> messages = new();
+    private CancellationTokenSource? currentResponseCancellation;
+    private ChatMessage? currentResponseMessage;
+    private ChatInput? chatInput;
+    private bool isLoading = false;
+    
+    // MCP Integration properties
+    private string notificationMessage = string.Empty;
+    private string errorMessage = string.Empty;
+    private bool isInitialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Logger.LogInformation("🔄 Initializing Chat component...");
+            
+            // Add system message only if not already present
+            if (!messages.Any(m => m.Role == ChatRole.System))
+            {
+                messages.Add(new(ChatRole.System, "You are a helpful AI assistant with access to various tools through MCP (Model Context Protocol)."));
+            }
+            
+            // Initialize MCP service if not already initialized
+            if (!isInitialized)
+            {
+                await McpService.InitializeAsync();
+                isInitialized = true;
+            }
+            
+            Logger.LogInformation("✅ Chat component initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Error initializing chat component");
+            errorMessage = $"Initialization error: {ex.Message}";
+            
+            // Add error message to chat if no other messages exist
+            if (!messages.Any(m => m.Text?.Contains("initialization error") == true))
+            {
+                messages.Add(new(ChatRole.Assistant, $"❌ There was an issue connecting to the MCP server. You can still try to chat, and I'll attempt to reconnect automatically."));
+            }
+        }
+    }
+
+    private async Task SendMessageAsync(ChatMessage userMessage)
+    {
+        try
+        {
+            Logger.LogInformation("📥 SendMessageAsync called with message: {Message}", userMessage.Text);
+            
+            // Clear any previous error messages
+            errorMessage = string.Empty;
+            
+            CancelAnyCurrentResponse();
+            
+            // Add user message to chat
+            messages.Add(userMessage);
+            isLoading = true;
+            await InvokeAsync(StateHasChanged);
+            
+            await StreamMcpResponseAsync(userMessage.Text ?? "");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Error in SendMessageAsync");
+            errorMessage = $"Error sending message: {ex.Message}";
+            
+            // Add error message to chat
+            messages.Add(new(ChatRole.Assistant, $"❌ Sorry, I encountered an error processing your message: {ex.Message}"));
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StreamMcpResponseAsync(string userInput)
+    {
+        try
+        {
+            Logger.LogInformation("🔄 Starting MCP streaming for input: {Input}", userInput);
+            
+            currentResponseCancellation = new();
+            
+            // Clear any previous UI state
+            notificationMessage = string.Empty;
+            
+            StateHasChanged();
+
+            // Get response from MCP service
+            Logger.LogInformation("📡 Calling MCP service...");
+            var response = await McpService.SendMessageAsync(userInput);
+            Logger.LogInformation("✅ MCP service responded successfully");
+            
+            // Extract the content string from the response
+            var responseText = response.Content ?? "No response received";
+            Logger.LogInformation("📝 Response text length: {Length}", responseText.Length);
+            
+            // Simulate streaming for visual effect
+            currentResponseMessage = new ChatMessage(ChatRole.Assistant, "");
+            
+            // Stream the response character by character
+            for (int i = 0; i <= responseText.Length; i += 10)
+            {
+                if (currentResponseCancellation.Token.IsCancellationRequested)
+                    break;
+                    
+                var chunk = responseText.Substring(0, Math.Min(i, responseText.Length));
+                currentResponseMessage = new ChatMessage(ChatRole.Assistant, chunk);
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(50, currentResponseCancellation.Token);
+            }
+            
+            // Store the final response in the conversation
+            if (currentResponseMessage != null)
+            {
+                messages.Add(currentResponseMessage);
+                currentResponseMessage = null;
+                
+                await InvokeAsync(StateHasChanged);
+                Logger.LogInformation("💬 Response added to conversation");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogInformation("⏹️ Response was cancelled");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Error getting MCP response: {Message}", ex.Message);
+            
+            var errorMessage = new ChatMessage(ChatRole.Assistant, $"❌ Sorry, I encountered an error: {ex.Message}");
+            messages.Add(errorMessage);
+            
+            currentResponseMessage = null;
+            
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleNotification(string message)
+    {
+        notificationMessage = message;
+        await InvokeAsync(StateHasChanged);
+        
+        // Auto-clear notification after 5 seconds
+        await Task.Delay(5000);
+        if (notificationMessage == message) // Only clear if it's still the same message
+        {
+            notificationMessage = string.Empty;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void CancelAnyCurrentResponse()
+    {
+        // If a response was cancelled while streaming, include it in the conversation so it's not lost
+        if (currentResponseMessage is not null)
+        {
+            messages.Add(currentResponseMessage);
+            currentResponseMessage = null;
+        }
+        
+        currentResponseCancellation?.Cancel();
+        currentResponseCancellation?.Dispose();
+        currentResponseCancellation = null;
+    }
+
+    private async Task ResetConversationAsync()
+    {
+        CancelAnyCurrentResponse();
+        messages.Clear();
+        messages.Add(new(ChatRole.System, "You are a helpful AI assistant with access to various tools through MCP (Model Context Protocol)."));
+        
+        // Clear all UI state
+        notificationMessage = string.Empty;
+        
+        await InvokeAsync(StateHasChanged);
+        await chatInput!.FocusAsync();
+    }
+
+    private async Task StartQuickAction(string prompt)
+    {
+        try
+        {
+            Logger.LogInformation("🚀 StartQuickAction called with prompt: {Prompt}", prompt);
+            
+            // Direct approach - bypass potential SignalR issues
+            var userMessage = new ChatMessage(ChatRole.User, prompt);
+            messages.Add(userMessage);
+            isLoading = true;
+            
+            // Force immediate UI update
+            StateHasChanged();
+            
+            // Directly call the streaming method
+            await StreamMcpResponseAsync(prompt);
+            
+            Logger.LogInformation("✅ StartQuickAction completed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Error in StartQuickAction: {Message}", ex.Message);
+            errorMessage = $"Quick action failed: {ex.Message}";
+            
+            // Add error message to chat
+            messages.Add(new(ChatRole.Assistant, $"❌ Sorry, I encountered an error: {ex.Message}"));
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        currentResponseCancellation?.Cancel();
+        currentResponseCancellation?.Dispose();
+    }
+
+    // Simplified test methods to debug the connection issue
+    private async Task TestTravelButton()
+    {
+        try
+        {
+            Logger.LogInformation("🧪 TestTravelButton clicked!");
+            
+            // Add a simple message without any complex operations
+            messages.Add(new ChatMessage(ChatRole.User, "I want to travel to Tokyo"));
+            messages.Add(new ChatMessage(ChatRole.Assistant, "🏯 Great choice! Tokyo is an amazing destination. Let me help you plan your trip..."));
+            
+            StateHasChanged();
+            Logger.LogInformation("✅ TestTravelButton completed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Error in TestTravelButton: {Message}", ex.Message);
+        }
+    }
+
+    private async Task TestResearchButton()
+    {
+        try
+        {
+            Logger.LogInformation("🧪 TestResearchButton clicked!");
+            
+            // Add a simple message without any complex operations
+            messages.Add(new ChatMessage(ChatRole.User, "Research AI trends in 2025"));
+            messages.Add(new ChatMessage(ChatRole.Assistant, "🤖 AI in 2025 is advancing rapidly with new breakthroughs in machine learning, natural language processing, and autonomous systems..."));
+            
+            StateHasChanged();
+            Logger.LogInformation("✅ TestResearchButton completed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "❌ Error in TestResearchButton: {Message}", ex.Message);
+        }
+    }
+}
+
+<style>
+    .progress-container, .notification-container, .elicitation-container, .error-container, .loading-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+        max-width: 400px;
+    }
+    
+    .notification-container {
+        top: 80px;
+    }
+    
+    .elicitation-container {
+        top: 140px;
+    }
+    
+    .error-container {
+        top: 20px;
+    }
+    
+    .loading-container {
+        top: 20px;
+    }
+    
+    .btn-quick-action:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .connection-status {
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1040;
+    }
+    
+    .chat-container {
+        position: sticky;
+        bottom: 0;
+        background: white;
+        border-top: 1px solid #dee2e6;
+        padding: 1rem;
+    }
+</style>

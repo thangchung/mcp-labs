@@ -7,12 +7,16 @@
   <Folder Name="/Solution Items/">
     <File Path=".gitignore" />
     <File Path="README.md" />
+    <File Path="test_research_agent.ps1" />
+    <File Path="test_travel_agent.ps1" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/McpAgent.Client/McpAgent.Client.csproj" />
     <Project Path="src/McpAgent.Core/McpAgent.Core.csproj" />
     <Project Path="src/McpAgent.EventStore/McpAgent.EventStore.csproj" />
     <Project Path="src/McpAgent.Server/McpAgent.Server.csproj" />
+    <Project Path="src/McpAgent.XClient/McpAgent.XClient.csproj" />
+    <Project Path="src/McpAgent.XServer/McpAgent.XServer.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/McpAgent.Client.Tests/McpAgent.Client.Tests.csproj" />

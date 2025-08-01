@@ -1,0 +1,190 @@
+.message {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+}
+
+.message-content {
+    display: flex;
+    align-items: flex-start;
+    max-width: 800px;
+    width: 100%;
+    position: relative;
+}
+
+.user-avatar, .assistant-avatar {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 2;
+}
+
+.user-avatar::before,
+.assistant-avatar::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #60a5fa, #3b82f6, #1d4ed8);
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.message:hover .user-avatar::before,
+.message:hover .assistant-avatar::before {
+    opacity: 1;
+}
+
+.user-avatar {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    font-size: 1.1rem;
+}
+
+.assistant-avatar {
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: white;
+    font-size: 1.1rem;
+}
+
+.message-text {
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    border-radius: 20px;
+    padding: 1.25rem 1.75rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-width: calc(100% - 4rem);
+    color: #f8fafc;
+    font-size: 1rem;
+    line-height: 1.7;
+    position: relative;
+    transition: all 0.3s ease;
+    text-align: left;
+}
+
+.message-text::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1));
+    border-radius: 20px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.message:hover .message-text::before {
+    opacity: 1;
+}
+
+.message:hover .message-text {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.user-message {
+    justify-content: center;
+}
+
+.user-message .message-content {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+}
+
+.user-message .user-avatar {
+    margin-right: 0;
+    margin-left: 1rem;
+}
+
+.user-message .message-text {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(29, 78, 216, 0.9));
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: white;
+    text-align: right;
+}
+
+.user-message .message-text::before {
+    background: linear-gradient(135deg, rgba(147, 197, 253, 0.2), rgba(59, 130, 246, 0.2));
+}
+
+.assistant-message {
+    justify-content: center;
+}
+
+.assistant-message .message-content {
+    justify-content: flex-start;
+}
+
+.assistant-message .message-text {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(4, 120, 87, 0.9));
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: white;
+    text-align: left;
+}
+
+.assistant-message .message-text::before {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.2));
+}
+
+.typing-indicator .cursor {
+    animation: blink 1s infinite;
+    color: #60a5fa;
+    font-weight: bold;
+    margin-left: 2px;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .message {
+        padding: 0 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .message-content {
+        max-width: 100%;
+    }
+    
+    .user-avatar, .assistant-avatar {
+        width: 2.5rem;
+        height: 2.5rem;
+        margin-right: 0.75rem;
+        font-size: 1rem;
+    }
+    
+    .user-message .user-avatar {
+        margin-left: 0.75rem;
+    }
+    
+    .message-text {
+        padding: 1rem 1.25rem;
+        font-size: 0.9rem;
+        max-width: calc(100% - 3.25rem);
+        border-radius: 16px;
+    }
+}

@@ -1,0 +1,153 @@
+@using Microsoft.AspNetCore.SignalR.Client
+@using McpAgent.Client.Models
+@implements IAsyncDisposable
+@inject NavigationManager Navigation
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🤖 MCP Sampling Request</h5>
+                </div>
+                <div class="modal-body">
+                    <p>@CurrentRequest?.Prompt</p>
+                    
+                    @if (CurrentRequest?.Options?.Any() == true)
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Please select an option:</label>
+                            @foreach (var option in CurrentRequest.Options)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="samplingOption" 
+                                           value="@option" @onchange="() => SelectedOption = option">
+                                    <label class="form-check-label">@option</label>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Your response:</label>
+                            <input type="text" class="form-control" @bind="CustomResponse" placeholder="Enter your response..." />
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="DeclineRequest">Decline</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmRequest" 
+                            disabled="@(string.IsNullOrEmpty(GetSelectedResponse()))">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private HubConnection? hubConnection;
+    private bool IsVisible = false;
+    private McpSamplingRequest? CurrentRequest;
+    private string SelectedOption = "";
+    private string CustomResponse = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/mcpHub"))
+            .Build();
+
+        hubConnection.On<McpSamplingRequest>("ElicitationRequest", (request) =>
+        {
+            CurrentRequest = request;
+            SelectedOption = "";
+            CustomResponse = "";
+            IsVisible = true;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private string GetSelectedResponse()
+    {
+        if (!string.IsNullOrEmpty(SelectedOption))
+            return SelectedOption;
+        
+        if (!string.IsNullOrEmpty(CustomResponse))
+            return CustomResponse;
+            
+        return "";
+    }
+
+    private async Task ConfirmRequest()
+    {
+        if (CurrentRequest == null || hubConnection == null) return;
+
+        var response = new McpSamplingResponse
+        {
+            RequestId = CurrentRequest.Id,
+            Response = GetSelectedResponse(),
+            Action = "confirm",
+            RespondedAt = DateTime.UtcNow
+        };
+
+        await hubConnection.SendAsync("SendSamplingResponse", response);
+        HideModal();
+    }
+
+    private async Task DeclineRequest()
+    {
+        if (CurrentRequest == null || hubConnection == null) return;
+
+        var response = new McpSamplingResponse
+        {
+            RequestId = CurrentRequest.Id,
+            Response = "declined",
+            Action = "decline",
+            RespondedAt = DateTime.UtcNow
+        };
+
+        await hubConnection.SendAsync("SendSamplingResponse", response);
+        HideModal();
+    }
+
+    private void HideModal()
+    {
+        IsVisible = false;
+        CurrentRequest = null;
+        SelectedOption = "";
+        CustomResponse = "";
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .modal.show {
+        display: block !important;
+    }
+    
+    .form-check {
+        margin-bottom: 8px;
+    }
+    
+    .modal-header {
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .modal-footer {
+        border-top: 1px solid #dee2e6;
+    }
+</style>
