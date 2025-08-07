@@ -1,0 +1,1 @@
+"""Pong service module."""

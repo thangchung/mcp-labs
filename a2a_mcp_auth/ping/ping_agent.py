@@ -1,0 +1,76 @@
+"""Ping service A2A agent implementation."""
+
+from a2a.types import (
+    AgentCapabilities,
+    AgentCard,
+    AgentSkill,
+    AuthorizationCodeOAuthFlow,
+    OAuthFlows,
+    OAuth2SecurityScheme,
+)
+
+from shared.config import settings
+
+
+def create_ping_agent_card() -> AgentCard:
+    """Create the agent card for the Ping service."""
+    
+    # Define OAuth2 security scheme for Microsoft Entra ID
+    oauth2_scheme = OAuth2SecurityScheme(
+        type="oauth2",
+        description="Microsoft Entra ID OAuth2 authentication",
+        flows=OAuthFlows(
+            authorization_code=AuthorizationCodeOAuthFlow(
+                authorization_url=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/authorize",
+                token_url=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/token",
+                scopes={
+                    "openid": "OpenID Connect authentication",
+                    "profile": "Access to user profile",
+                    "email": "Access to user email",
+                    settings.required_scopes: "Admin access to ping service"
+                }
+            )
+        )
+    )
+    
+    # Define the ping skill
+    ping_skill = AgentSkill(
+        id="ping",
+        name="ping",
+        description="Sends ping messages to the pong service and relays responses",
+        tags=["ping-pong", "communication", "test", "client"],
+        examples=[
+            "Send a ping to the pong service",
+            "ping",
+            "Can you ping the pong service?",
+            "Test the connection with a ping"
+        ]
+    )
+    
+    # Create agent capabilities
+    capabilities = AgentCapabilities(
+        streaming=False,
+        supports_progress_updates=False,
+        supports_cancellation=False
+    )
+    
+    # Create the agent card
+    agent_card = AgentCard(
+        name="Ping Service",
+        description="A2A Ping service that communicates with the pong service using Microsoft Entra ID authentication",
+        url=settings.ping_service_url,
+        version="1.0.0",
+        protocol_version="0.3.0",
+        capabilities=capabilities,
+        skills=[ping_skill],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
+        security_schemes={
+            "oauth2": oauth2_scheme
+        },
+        security=[
+            {"oauth2": ["openid", "profile", "email", settings.required_scopes]}
+        ]
+    )
+    
+    return agent_card
