@@ -7,6 +7,18 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddSignalR();
 
+// Add CORS to allow client connections
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("BlazorClientPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:5000", "https://localhost:5001", "http://localhost:5173", "https://localhost:5173")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 // Configure MCP Agent options
 builder.Services.Configure<McpAgentOptions>(options =>
 {
@@ -16,7 +28,19 @@ builder.Services.Configure<McpAgentOptions>(options =>
     options.OpenAiEndpoint = builder.Configuration["OpenAI:Endpoint"] ?? "https://api.openai.com/v1";
 });
 
-// Register MCP Agent Service
+// Register MCP Services with full feature support
+builder.Services.AddSingleton<McpSamplingService>();
+builder.Services.AddSingleton<McpNotificationService>();
+builder.Services.AddSingleton<McpProgressService>();
+builder.Services.AddSingleton<McpElicitationService>();
+
+// Register notification and progress handlers
+builder.Services.AddSingleton<ConsoleNotificationHandler>();
+builder.Services.AddSingleton<SignalRNotificationHandler>();
+builder.Services.AddSingleton<ConsoleProgressHandler>();
+builder.Services.AddSingleton<SignalRProgressHandler>();
+
+// Register enhanced MCP Agent Service
 builder.Services.AddSingleton<McpAgentService>();
 
 builder.Services.AddResponseCompression(opts =>
@@ -27,7 +51,19 @@ builder.Services.AddResponseCompression(opts =>
 
 var app = builder.Build();
 
+// Initialize MCP services with handlers
+var notificationService = app.Services.GetRequiredService<McpNotificationService>();
+var progressService = app.Services.GetRequiredService<McpProgressService>();
+
+notificationService.RegisterHandler(app.Services.GetRequiredService<ConsoleNotificationHandler>());
+notificationService.RegisterHandler(app.Services.GetRequiredService<SignalRNotificationHandler>());
+progressService.RegisterHandler(app.Services.GetRequiredService<ConsoleProgressHandler>());
+progressService.RegisterHandler(app.Services.GetRequiredService<SignalRProgressHandler>());
+
 app.UseResponseCompression();
+
+// Configure CORS
+app.UseCors("BlazorClientPolicy");
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

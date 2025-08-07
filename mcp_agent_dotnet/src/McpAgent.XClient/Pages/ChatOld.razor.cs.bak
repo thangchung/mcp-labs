@@ -1,0 +1,250 @@
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.SignalR.Client;
+using McpAgent.XServer.Models;
+
+namespace McpAgent.XClient.Pages;
+
+public partial class Chat : ComponentBase, IAsyncDisposable
+{
+    [Inject] public NavigationManager Navigation { get; set; } = default!;
+
+    private HubConnection? hubConnection;
+    private List<string> messages = new();
+    private string? userInput;
+    private string? messageInput;
+    private ElicitationUIState elicitationState = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl("http://localhost:8007/chathub")
+            .Build();
+
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodedMsg = $"{user}: {message}";
+            messages.Add(encodedMsg);
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("ReceiveStatus", (status) =>
+        {
+            messages.Add($"System: {status}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("ReceiveTravelResponse", (response) =>
+        {
+            messages.Add($"Travel Agent: {response}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("ReceiveResearchResponse", (response) =>
+        {
+            messages.Add($"Research Agent: {response}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        // MCP Elicitation handlers
+        hubConnection.On<McpElicitationRequest>("StartElicitation", async (request) =>
+        {
+            await ShowElicitationModal(request);
+        });
+
+        hubConnection.On<int>("ElicitationComplete", (sessionId) =>
+        {
+            HideElicitationModal();
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task Send()
+    {
+        if (hubConnection is not null && !string.IsNullOrWhiteSpace(userInput) && !string.IsNullOrWhiteSpace(messageInput))
+        {
+            await hubConnection.SendAsync("SendMessage", userInput, messageInput);
+            messageInput = string.Empty; // Clear the message input after sending
+        }
+    }
+
+    private async Task TravelToTokyo()
+    {
+        if (hubConnection is not null)
+        {
+            var user = string.IsNullOrWhiteSpace(userInput) ? "User" : userInput;
+            var destination = "Tokyo";
+            messages.Add($"You: Travel to Tokyo request");
+            await hubConnection.SendAsync("ExecuteTravelAgent", user, destination, new Dictionary<string, object?>());
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ResearchAI()
+    {
+        if (hubConnection is not null)
+        {
+            var user = string.IsNullOrWhiteSpace(userInput) ? "User" : userInput;
+            var topic = "Research the latest developments in Artificial Intelligence, including recent breakthroughs and trends.";
+            messages.Add($"You: Research AI request");
+            await hubConnection.SendAsync("ExecuteResearchAgent", user, topic, new Dictionary<string, object?>());
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleKeyPress(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await Send();
+        }
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    /// <summary>
+    /// Show elicitation modal with MCP request data
+    /// </summary>
+    private async Task ShowElicitationModal(McpElicitationRequest request)
+    {
+        elicitationState = new ElicitationUIState
+        {
+            IsVisible = true,
+            SessionId = request.SessionId,
+            ToolName = request.ToolName,
+            Title = $"Complete {request.ToolName.Replace("_", " ").ToTitleCase()} Request",
+            Message = request.Message,
+            Fields = ConvertSchemaToFields(request.RequestedSchema),
+            IsSubmitting = false,
+            ValidationErrors = new Dictionary<string, string>()
+        };
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Hide elicitation modal
+    /// </summary>
+    private void HideElicitationModal()
+    {
+        elicitationState.IsVisible = false;
+        elicitationState.IsSubmitting = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Handle elicitation modal actions (accept/reject/cancel)
+    /// </summary>
+    private async Task HandleElicitationAction(string action)
+    {
+        if (hubConnection == null) return;
+
+        var response = new McpElicitationResponse
+        {
+            SessionId = elicitationState.SessionId,
+            Action = action,
+            Content = new Dictionary<string, object?>()
+        };
+
+        if (action == "accept")
+        {
+            // Get form data from the modal
+            foreach (var field in elicitationState.Fields)
+            {
+                if (field.Value != null)
+                {
+                    response.Content[field.Name] = field.Value;
+                }
+            }
+        }
+
+        try
+        {
+            await hubConnection.SendAsync("SubmitElicitationResponse", response);
+
+            if (action == "accept")
+            {
+                messages.Add($"You: ✅ Parameters confirmed and submitted");
+            }
+            else if (action == "reject")
+            {
+                messages.Add($"You: ❌ Parameter collection rejected");
+            }
+            else if (action == "cancel")
+            {
+                messages.Add($"You: ⚠️ Parameter collection cancelled");
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            messages.Add($"System: ❌ Error submitting elicitation response: {ex.Message}");
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>
+    /// Convert MCP JSON schema to UI field definitions
+    /// </summary>
+    private List<ElicitationField> ConvertSchemaToFields(McpJsonSchema schema)
+    {
+        var fields = new List<ElicitationField>();
+
+        foreach (var property in schema.Properties)
+        {
+            var field = new ElicitationField
+            {
+                Name = property.Key,
+                Type = property.Value.Type,
+                Title = property.Value.Title ?? property.Key.Replace("_", " ").ToTitleCase(),
+                Description = property.Value.Description ?? "",
+                IsRequired = schema.Required.Contains(property.Key),
+                MinValue = property.Value.Minimum,
+                MaxValue = property.Value.Maximum,
+                MinLength = property.Value.MinLength,
+                MaxLength = property.Value.MaxLength,
+                Pattern = property.Value.Pattern,
+                Format = property.Value.Format,
+                Options = property.Value.Enum,
+                OptionLabels = property.Value.EnumNames,
+                DefaultValue = property.Value.Default,
+                Value = property.Value.Default
+            };
+
+            fields.Add(field);
+        }
+
+        return fields;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+/// <summary>
+/// Extension method to convert strings to title case
+/// </summary>
+public static class StringExtensions
+{
+    public static string ToTitleCase(this string input)
+    {
+        if (string.IsNullOrEmpty(input)) return string.Empty;
+
+        var words = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < words.Length; i++)
+        {
+            if (words[i].Length > 0)
+            {
+                words[i] = char.ToUpper(words[i][0]) + words[i].Substring(1).ToLower();
+            }
+        }
+        return string.Join(' ', words);
+    }
+}

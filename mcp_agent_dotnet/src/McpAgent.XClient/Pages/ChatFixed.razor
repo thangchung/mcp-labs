@@ -1,6 +1,7 @@
 @page "/chat"
 @using Microsoft.AspNetCore.SignalR.Client
-@inject NavigationManager Navigation
+@using McpAgent.XClient.Models
+@using Microsoft.AspNetCore.Components
 @implements IAsyncDisposable
 
 <PageTitle>MCP Agent SignalR Chat</PageTitle>
@@ -31,7 +32,7 @@
                     {
                         <div class="message">
                             <small class="message-time">@DateTime.Now.ToString("HH:mm:ss")</small>
-                            <div class="message-content">@message</div>
+                            <MarkdownRenderer Content="@message" CssClass="message-content" />
                         </div>
                     }
                 }
@@ -66,6 +67,62 @@
         </div>
     </div>
 </div>
+
+<!-- Simple Elicitation Modal -->
+@if (elicitationState.IsVisible)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Information Required</h5>
+                </div>
+                <div class="modal-body">
+                    <p>@elicitationState.Message</p>
+                    
+                    @if (elicitationState.Fields?.Any() == true)
+                    {
+                        <form>
+                            @foreach (var field in elicitationState.Fields)
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        @field.Name
+                                        @if (field.Required)
+                                        {
+                                            <span class="text-danger">*</span>
+                                        }
+                                    </label>
+                                    
+                                    @if (!string.IsNullOrEmpty(field.Description))
+                                    {
+                                        <small class="form-text text-muted d-block">@field.Description</small>
+                                    }
+                                    
+                                    <input type="text" class="form-control" @bind="field.Value" required="@field.Required" />
+                                    
+                                    @if (!string.IsNullOrEmpty(field.ErrorMessage))
+                                    {
+                                        <div class="text-danger small">@field.ErrorMessage</div>
+                                    }
+                                </div>
+                            }
+                        </form>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="@(() => HandleElicitationAction("decline"))">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" @onclick="@(() => HandleElicitationAction("accept"))">
+                        Submit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
 
 <style>
     .chat-container {
@@ -151,6 +208,108 @@
     .message-content {
         margin-top: 5px;
         line-height: 1.4;
+    }
+
+    /* Markdown content styling */
+    .message-content .markdown-content {
+        color: inherit;
+    }
+
+    .message-content .markdown-content p {
+        margin: 0.5em 0;
+        color: inherit;
+    }
+
+    .message-content .markdown-content h1,
+    .message-content .markdown-content h2,
+    .message-content .markdown-content h3,
+    .message-content .markdown-content h4,
+    .message-content .markdown-content h5,
+    .message-content .markdown-content h6 {
+        color: #ffeb3b;
+        margin: 0.8em 0 0.4em 0;
+        font-weight: 600;
+    }
+
+    .message-content .markdown-content strong {
+        color: #ffeb3b;
+        font-weight: 700;
+    }
+
+    .message-content .markdown-content em {
+        color: #e3f2fd;
+        font-style: italic;
+    }
+
+    .message-content .markdown-content code {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        color: #fff;
+    }
+
+    .message-content .markdown-content pre {
+        background: rgba(0, 0, 0, 0.4);
+        padding: 15px;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin: 10px 0;
+        border-left: 4px solid #007bff;
+    }
+
+    .message-content .markdown-content pre code {
+        background: none;
+        padding: 0;
+        color: #fff;
+    }
+
+    .message-content .markdown-content ul,
+    .message-content .markdown-content ol {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+
+    .message-content .markdown-content li {
+        margin: 5px 0;
+        color: inherit;
+    }
+
+    .message-content .markdown-content blockquote {
+        border-left: 4px solid #28a745;
+        margin: 10px 0;
+        padding: 10px 15px;
+        background: rgba(40, 167, 69, 0.1);
+        font-style: italic;
+    }
+
+    .message-content .markdown-content a {
+        color: #87ceeb;
+        text-decoration: underline;
+    }
+
+    .message-content .markdown-content a:hover {
+        color: #add8e6;
+    }
+
+    .message-content .markdown-content table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 10px 0;
+    }
+
+    .message-content .markdown-content th,
+    .message-content .markdown-content td {
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 8px 12px;
+        text-align: left;
+    }
+
+    .message-content .markdown-content th {
+        background: rgba(255, 255, 255, 0.1);
+        font-weight: 600;
+        color: #ffeb3b;
     }
 
     .input-section {
@@ -260,93 +419,3 @@
         background: rgba(255, 255, 255, 0.5);
     }
 </style>
-
-@code {
-    private HubConnection? hubConnection;
-    private List<string> messages = [];
-    private string? userInput;
-    private string? messageInput;
-
-    protected override async Task OnInitializedAsync()
-    {
-        hubConnection = new HubConnectionBuilder()
-            .WithUrl(Navigation.ToAbsoluteUri("/chathub"))
-            .Build();
-
-        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
-        {
-            var encodedMsg = $"{user}: {message}";
-            messages.Add(encodedMsg);
-            InvokeAsync(StateHasChanged);
-        });
-
-        hubConnection.On<string>("ReceiveStatus", (status) => {
-            messages.Add($"System: {status}");
-            InvokeAsync(StateHasChanged);
-        });
-
-        hubConnection.On<string>("ReceiveTravelResponse", (response) => {
-            messages.Add($"Travel Agent: {response}");
-            InvokeAsync(StateHasChanged);
-        });
-
-        hubConnection.On<string>("ReceiveResearchResponse", (response) => {
-            messages.Add($"Research Agent: {response}");
-            InvokeAsync(StateHasChanged);
-        });
-
-        await hubConnection.StartAsync();
-    }
-
-    private async Task Send()
-    {
-        if (hubConnection is not null && !string.IsNullOrWhiteSpace(userInput) && !string.IsNullOrWhiteSpace(messageInput))
-        {
-            await hubConnection.SendAsync("SendMessage", userInput, messageInput);
-            messageInput = string.Empty; // Clear the message input after sending
-        }
-    }
-
-    private async Task TravelToTokyo()
-    {
-        if (hubConnection is not null)
-        {
-            var user = string.IsNullOrWhiteSpace(userInput) ? "User" : userInput;
-            var destination = "Tokyo";
-            messages.Add($"You: Travel to Tokyo request");
-            await hubConnection.SendAsync("ExecuteTravelAgent", user, destination);
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task ResearchAI()
-    {
-        if (hubConnection is not null)
-        {
-            var user = string.IsNullOrWhiteSpace(userInput) ? "User" : userInput;
-            var topic = "Research the latest developments in Artificial Intelligence, including recent breakthroughs and trends.";
-            messages.Add($"You: Research AI request");
-            await hubConnection.SendAsync("ExecuteResearchAgent", user, topic);
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task HandleKeyPress(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !e.ShiftKey)
-        {
-            await Send();
-        }
-    }
-
-    public bool IsConnected =>
-        hubConnection?.State == HubConnectionState.Connected;
-
-    public async ValueTask DisposeAsync()
-    {
-        if (hubConnection is not null)
-        {
-            await hubConnection.DisposeAsync();
-        }
-    }
-}

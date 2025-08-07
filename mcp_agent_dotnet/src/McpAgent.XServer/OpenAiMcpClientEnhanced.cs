@@ -365,6 +365,126 @@ public class OpenAiMcpClientEnhanced
         }
     }
 
+    /// <summary>
+    /// Enhanced MCP client with sampling support
+    /// </summary>
+    public async Task<JsonElement> CreateSampleAsync(string prompt, int maxTokens = 500, double temperature = 0.7, Dictionary<string, object?>? metadata = null)
+    {
+        _samplingCount++;
+        _logger.LogInformation("🎲 Creating MCP sampling request #{Count}", _samplingCount);
+        
+        // In a real implementation, this would call the MCP server's sampling endpoint
+        // For now, we'll simulate a sampling response
+        await Task.Delay(1000);
+        
+        var response = await GenerateSimulatedSamplingResponse(prompt, metadata);
+        
+        var result = JsonSerializer.SerializeToElement(new
+        {
+            content = new[]
+            {
+                new { type = "text", text = response }
+            },
+            model = "mcp-sampling-ai",
+            stop_reason = "stop_sequence",
+            usage = new
+            {
+                input_tokens = EstimateTokens(prompt),
+                output_tokens = EstimateTokens(response)
+            }
+        });
+        
+        return result;
+    }
+    
+    private async Task<string> GenerateSimulatedSamplingResponse(string prompt, Dictionary<string, object?>? metadata)
+    {
+        await Task.Delay(500);
+        
+        var promptLower = prompt.ToLowerInvariant();
+        
+        if (promptLower.Contains("travel"))
+        {
+            return @"🎲 **MCP Sampling Analysis - Travel Decision**
+
+**Parameter Assessment:**
+✅ Destination identified successfully
+⚡ Enhanced recommendations available
+
+**AI Optimization Suggestions:**
+• Consider seasonal weather patterns for optimal timing
+• Cross-reference local events and festivals
+• Evaluate budget-friendly alternatives in nearby regions
+• Factor in travel duration for activity planning
+
+**Risk Analysis:**
+⚠️ Verify current travel restrictions and requirements
+⚠️ Check local safety conditions and health advisories
+⚠️ Consider currency fluctuations and local pricing
+
+**Execution Strategy:**
+1. Prioritize user safety and satisfaction
+2. Provide multiple options for flexibility
+3. Include practical logistics and local insights
+4. Offer real-time updates and support
+
+**Confidence Assessment:** High - Comprehensive travel analysis completed";
+        }
+        else if (promptLower.Contains("research"))
+        {
+            return @"🎲 **MCP Sampling Analysis - Research Decision**
+
+**Topic Analysis:**
+✅ Research scope clearly defined
+📊 Multiple information sources available
+
+**Methodology Optimization:**
+• Prioritize authoritative and recent sources
+• Include diverse perspectives and viewpoints
+• Cross-validate information across sources
+• Structure findings for maximum clarity
+
+**Quality Assurance:**
+⚡ Source credibility verification recommended
+⚡ Bias detection and mitigation strategies
+⚡ Currency and relevance assessment
+
+**Delivery Strategy:**
+1. Executive summary with key findings
+2. Detailed analysis with supporting evidence
+3. Implications and future considerations
+4. Actionable recommendations
+
+**Confidence Assessment:** High - Structured research approach validated";
+        }
+        else
+        {
+            return @"🎲 **MCP Sampling Analysis - General Decision**
+
+**Context Assessment:**
+📋 Request parameters analyzed
+🎯 Optimization opportunities identified
+
+**Strategic Recommendations:**
+• Ensure comprehensive approach to the task
+• Consider user expectations and requirements
+• Evaluate multiple solution pathways
+• Prioritize quality and accuracy
+
+**Implementation Notes:**
+⚡ Follow best practices for the domain
+⚡ Maintain clear communication throughout
+⚡ Provide actionable and practical outcomes
+
+**Confidence Assessment:** Medium - General analysis framework applied";
+        }
+    }
+    
+    private int EstimateTokens(string text)
+    {
+        return Math.Max(1, text.Length / 4);
+    }
+
     private async Task<ToolAction?> DetermineToolActionWithAI(string userInput, string intentAnalysis)
     {
         var input = userInput.ToLowerInvariant();

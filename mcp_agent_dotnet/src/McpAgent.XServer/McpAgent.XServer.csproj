@@ -18,9 +18,6 @@
   <ItemGroup>
     <ProjectReference Include="..\McpAgent.Core\McpAgent.Core.csproj" />
     <ProjectReference Include="..\McpAgent.Client\McpAgent.Client.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\McpAgent.XClient\McpAgent.XClient.csproj" />
   </ItemGroup>
 

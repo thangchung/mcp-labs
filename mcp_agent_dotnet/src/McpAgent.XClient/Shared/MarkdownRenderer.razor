@@ -1,0 +1,58 @@
+@using Markdig
+@implements IDisposable
+
+@if (!string.IsNullOrWhiteSpace(Content))
+{
+    @((MarkupString)_htmlContent)
+}
+
+@code {
+    private string _htmlContent = string.Empty;
+    private string? _lastContent;
+    private MarkdownPipeline? _pipeline;
+
+    [Parameter]
+    public string? Content { get; set; }
+
+    [Parameter]
+    public string CssClass { get; set; } = "markdown-content";
+
+    protected override void OnParametersSet()
+    {
+        if (Content != _lastContent)
+        {
+            _lastContent = Content;
+            _htmlContent = RenderMarkdown(Content);
+        }
+    }
+
+    private string RenderMarkdown(string? markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+            return string.Empty;
+
+        try
+        {
+            // Initialize pipeline with advanced extensions for better formatting
+            _pipeline ??= new MarkdownPipelineBuilder()
+                .UseAdvancedExtensions()
+                .UseSoftlineBreakAsHardlineBreak() // Convert single line breaks to <br>
+                .Build();
+
+            var html = Markdown.ToHtml(markdown, _pipeline);
+            
+            // Wrap in a div with the specified CSS class for styling
+            return $"<div class=\"{CssClass}\">{html}</div>";
+        }
+        catch
+        {
+            // Fallback to plain text if markdown parsing fails
+            return $"<div class=\"{CssClass}\">{System.Web.HttpUtility.HtmlEncode(markdown)}</div>";
+        }
+    }
+
+    public void Dispose()
+    {
+        _pipeline = null;
+    }
+}
