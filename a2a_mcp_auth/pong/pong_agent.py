@@ -7,6 +7,7 @@ from a2a.types import (
     AuthorizationCodeOAuthFlow,
     OAuthFlows,
     OAuth2SecurityScheme,
+    SecuritySchemeBase,
 )
 
 from shared.config import settings
@@ -21,8 +22,8 @@ def create_pong_agent_card() -> AgentCard:
         description="Microsoft Entra ID OAuth2 authentication",
         flows=OAuthFlows(
             authorization_code=AuthorizationCodeOAuthFlow(
-                authorization_url=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/authorize",
-                token_url=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/token",
+                authorizationUrl=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/authorize",
+                tokenUrl=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/token",
                 scopes={
                     "openid": "OpenID Connect authentication",
                     "profile": "Access to user profile",
@@ -48,9 +49,7 @@ def create_pong_agent_card() -> AgentCard:
     
     # Create agent capabilities
     capabilities = AgentCapabilities(
-        streaming=False,
-        supports_progress_updates=False,
-        supports_cancellation=False
+        streaming=False
     )
     
     # Create the agent card
@@ -59,11 +58,11 @@ def create_pong_agent_card() -> AgentCard:
         description="A2A Pong service that responds to ping messages with Microsoft Entra ID authentication",
         url=settings.pong_service_url,
         version="1.0.0",
-        protocol_version="0.3.0",
+        protocolVersion="0.3.0",
         capabilities=capabilities,
         skills=[pong_skill],
-        default_input_modes=["text"],
-        default_output_modes=["text"],
+        defaultInputModes=["text"],
+        defaultOutputModes=["text"],
         security_schemes={
             "oauth2": oauth2_scheme
         },

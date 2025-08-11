@@ -1,0 +1,143 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Ping Service",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "ping.main",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DEBUG": "true",
+                "LOG_LEVEL": "DEBUG"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "args": [],
+            "presentation": {
+                "group": "A2A Services",
+                "order": 1
+            }
+        },
+        {
+            "name": "Debug Pong Service",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pong.main",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DEBUG": "true",
+                "LOG_LEVEL": "DEBUG"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "args": [],
+            "presentation": {
+                "group": "A2A Services",
+                "order": 2
+            }
+        },
+        {
+            "name": "Debug MCP Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "mcp_server.main",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DEBUG": "true",
+                "LOG_LEVEL": "DEBUG"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "args": [],
+            "presentation": {
+                "group": "A2A Services",
+                "order": 3
+            }
+        },
+        {
+            "name": "Debug All Services",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DEBUG": "true",
+                "LOG_LEVEL": "DEBUG"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "args": [
+                "ping.main:app",
+                "--host", "0.0.0.0",
+                "--port", "8000",
+                "--reload"
+            ],
+            "presentation": {
+                "group": "Debug All",
+                "order": 4
+            }
+        },
+        {
+            "name": "Debug Integration Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_mcp_integration.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DEBUG": "true",
+                "LOG_LEVEL": "DEBUG"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "presentation": {
+                "group": "Testing",
+                "order": 5
+            }
+        },
+        {
+            "name": "Debug Demo Script",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/demo.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DEBUG": "true",
+                "LOG_LEVEL": "DEBUG"
+            },
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "presentation": {
+                "group": "Testing",
+                "order": 6
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Debug All A2A Services",
+            "configurations": [
+                "Debug MCP Server",
+                "Debug Ping Service", 
+                "Debug Pong Service"
+            ],
+            "stopAll": true,
+            "presentation": {
+                "group": "Compound",
+                "order": 1
+            }
+        }
+    ]
+}

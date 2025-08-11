@@ -17,8 +17,12 @@ from a2a.auth.user import User as A2AUser
 from shared.auth import auth_handler, auth_middleware
 from shared.config import settings
 from shared.models import UserInfo
+from shared.debug_utils import setup_debug_logging
 from .handlers import PingHandler
 from .ping_agent import create_ping_agent_card
+
+# Setup debug logging
+setup_debug_logging()
 
 # Configure logging
 logging.basicConfig(
@@ -67,8 +71,7 @@ class CustomCallContextBuilder:
         
         return ServerCallContext(
             user=user,
-            activated_extensions=set(),
-            metadata=metadata
+            activated_extensions=set()
         )
 
 
@@ -79,6 +82,11 @@ app = FastAPI(
     version="1.0.0",
     debug=settings.debug
 )
+
+# Add debug middleware if enabled
+if settings.debug_requests:
+    from shared.debug_utils import DebugMiddleware
+    app.add_middleware(DebugMiddleware)
 
 # Create agent card and handler
 agent_card = create_ping_agent_card()
@@ -154,96 +162,111 @@ async def manual_ping(
     request: Request,
     user_info: UserInfo = Depends(auth_middleware.require_admin)
 ):
-    """Manual ping endpoint for testing (requires admin role)."""
+    """Manual ping endpoint that sends a ping via A2A protocol to pong service (requires admin role)."""
     try:
         logger.info(f"Manual ping request from {user_info.name}")
         
-        # Get auth token from request
+        # Get auth token from request for forwarding
         auth_header = request.headers.get("authorization")
-        if not auth_header:
-            raise HTTPException(status_code=401, detail="Authorization header required")
         
-        # Create a simple ping message using the handler
-        from a2a.types import Message, Part, Role, TextPart, MessageSendParams
-        
-        ping_message = Message(
-            message_id=str(uuid.uuid4()),
-            context_id="manual-ping",
-            role=Role.user,
-            parts=[Part(text_part=TextPart(text="ping"))]
-        )
-        
-        params = MessageSendParams(message=ping_message)
-        context = context_builder.build(request)
-        
-        # Process the ping through the handler
-        response = await ping_handler.on_message_send(params, context)
-        
-        # Extract response text
-        response_text = ""
-        if hasattr(response.root, 'message') and response.root.message.parts:
-            for part in response.root.message.parts:
-                if hasattr(part, 'text_part') and part.text_part:
-                    response_text += part.text_part.text
-        
-        return {
-            "message": "Ping sent successfully",
-            "response": response_text,
-            "user": user_info.name
+        results = {
+            "message": "Ping sent to pong service via A2A protocol",
+            "user": user_info.name,
+            "user_id": user_info.user_id,
+            "is_admin": user_info.is_admin,
+            "timestamp": datetime.now().isoformat(),
+            "pong_service_a2a": None
         }
+        
+        # Call pong service using A2A protocol only
+        try:
+            logger.info("Calling pong service via A2A protocol...")
+            
+            # Create A2A message for pong service - request includes MCP enhancement
+            a2a_message_id = str(uuid.uuid4())
+            context_id = str(uuid.uuid4())
+            
+            a2a_request = {
+                "jsonrpc": "2.0",
+                "id": str(uuid.uuid4()),
+                "method": "message/send",
+                "params": {
+                    "message": {
+                        "messageId": a2a_message_id,
+                        "contextId": context_id,
+                        "role": "user",
+                        "parts": [
+                            {
+                                "kind": "text",
+                                "text": f"ping from {user_info.name} via A2A protocol - please include MCP enhancement if admin user"
+                            }
+                        ]
+                    }
+                }
+            }
+            
+            headers = {"Content-Type": "application/json"}
+            if auth_header:
+                headers["Authorization"] = auth_header
+            
+            async with httpx.AsyncClient() as client:
+                pong_response = await client.post(
+                    f"{settings.pong_service_url}/pong/mcp",  # A2A endpoint root
+                    json=a2a_request,
+                    headers=headers,
+                    timeout=10.0
+                )
+                
+                if pong_response.status_code == 200:
+                    pong_data = pong_response.json()
+                    results["pong_service_a2a"] = {
+                        "status": "success",
+                        "protocol": "A2A",
+                        "response": pong_data,
+                        "status_code": pong_response.status_code
+                    }
+                    logger.info("Pong service (A2A) responded successfully")
+                else:
+                    results["pong_service_a2a"] = {
+                        "status": "error",
+                        "protocol": "A2A",
+                        "error": f"HTTP {pong_response.status_code}",
+                        "response": pong_response.text[:200]
+                    }
+                    logger.warning(f"Pong service (A2A) returned {pong_response.status_code}")
+                    
+        except Exception as e:
+            logger.error(f"Error calling pong service via A2A: {str(e)}")
+            results["pong_service_a2a"] = {
+                "status": "error",
+                "protocol": "A2A",
+                "error": str(e)
+            }
+        
+        return results
         
     except HTTPException as e:
         raise e
     except Exception as e:
         logger.error(f"Error in manual ping: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to send ping")
-
-
-@app.post("/ping/test")
-async def test_ping():
-    """Simple test ping endpoint (no authentication required for development)."""
-    try:
-        logger.info("Test ping request received")
-        
-        # Direct HTTP request to pong service
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.pong_service_url}/pong/test",
-                json={"message": "ping"},
-                headers={"Content-Type": "application/json"},
-                timeout=10.0
-            )
-            
-            if response.status_code == 200:
-                pong_response = response.json()
-                return {
-                    "status": "success",
-                    "message": "Test ping completed",
-                    "ping_sent": "ping",
-                    "pong_received": pong_response.get("message", "pong"),
-                    "timestamp": datetime.now().isoformat()
-                }
-            else:
-                logger.error(f"Pong service returned status {response.status_code}")
-                return {
-                    "status": "error",
-                    "message": "Pong service not responding",
-                    "error": f"HTTP {response.status_code}"
-                }
-                
-    except Exception as e:
-        logger.error(f"Error in test ping: {str(e)}")
-        return {
-            "status": "error",
-            "message": "Test ping failed",
-            "error": str(e)
-        }
+        raise HTTPException(status_code=500, detail="Failed to process ping")
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "ping"}
+
+
+@app.get("/debug")
+async def debug_info():
+    """Debug information endpoint (only available in debug mode)."""
+    if not settings.debug:
+        raise HTTPException(status_code=404, detail="Debug endpoint not available")
+    
+    from shared.debug_utils import create_debug_endpoint
+    debug_func = create_debug_endpoint()
+    return debug_func()
 
 
 @app.get("/")
@@ -253,15 +276,21 @@ async def root():
         "service": "Ping Service",
         "version": "1.0.0",
         "description": "A2A Ping service with Microsoft Entra ID authentication",
+        "architecture": "Pure A2A Protocol - communicates only via Agent-to-Agent protocol",
         "endpoints": {
             "agent_card": "/.well-known/agent.json",
             "a2a_rpc": "/",
             "login": "/auth/login", 
             "callback": "/auth/callback",
             "ping": "/ping",
-            "health": "/health"
+            "health": "/health",
+            "debug": "/debug"
         },
-        "pong_service": settings.pong_service_url
+        "communication": {
+            "protocol": "A2A (Agent-to-Agent)",
+            "pong_service": settings.pong_service_url,
+            "note": "Direct HTTP calls removed - uses A2A protocol exclusively"
+        }
     }
 
 

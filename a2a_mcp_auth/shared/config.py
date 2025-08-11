@@ -25,6 +25,14 @@ class Settings(BaseSettings):
         default="http://localhost:8001", 
         description="Pong service URL"
     )
+    mcp_server_url: str = Field(
+        default="http://localhost:8002",
+        description="MCP server URL"
+    )
+    mcp_server_port: int = Field(
+        default=8002,
+        description="MCP server port"
+    )
     
     # Security Configuration
     jwt_secret_key: str = Field(
@@ -39,6 +47,10 @@ class Settings(BaseSettings):
         default="PingPongAdmin",
         description="Admin role name in Azure AD"
     )
+    admin_group_id: str = Field(
+        default="",
+        description="Admin group ID in Azure AD (optional)"
+    )
     required_scopes: str = Field(
         default="api://your-app-id/admin",
         description="Required OAuth2 scopes"
@@ -47,6 +59,10 @@ class Settings(BaseSettings):
     # Development Configuration
     debug: bool = Field(default=False, description="Debug mode")
     log_level: str = Field(default="INFO", description="Logging level")
+    debug_auth: bool = Field(default=False, description="Enable authentication debug logging")
+    debug_a2a: bool = Field(default=False, description="Enable A2A debug logging")
+    debug_mcp: bool = Field(default=False, description="Enable MCP debug logging")
+    debug_requests: bool = Field(default=False, description="Enable HTTP request/response debug logging")
     
     class Config:
         env_file = ".env"
