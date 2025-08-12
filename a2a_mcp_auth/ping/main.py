@@ -1,14 +1,18 @@
 """Ping service FastAPI application."""
 
 import logging
+import time
 import uuid
 from datetime import datetime
+from typing import Optional
 
 import httpx
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer
+from jose import jwt, jwk
+from jose.exceptions import JWTError
 
 from a2a.server.apps import A2AFastAPIApplication
 from a2a.server.context import ServerCallContext
@@ -17,7 +21,7 @@ from a2a.auth.user import User as A2AUser
 from shared.auth import auth_handler, auth_middleware
 from shared.config import settings
 from shared.models import UserInfo
-from shared.debug_utils import setup_debug_logging
+from shared.debug_utils import setup_debug_logging, log_auth_attempt, log_token_validation
 from .handlers import PingHandler
 from .ping_agent import create_ping_agent_card
 
@@ -33,6 +37,237 @@ logger = logging.getLogger(__name__)
 
 # Security
 security = HTTPBearer(auto_error=False)
+
+
+class JWKSTokenValidator:
+    """JWT token validator using Microsoft Entra ID JWKS for Ping service."""
+    
+    def __init__(self):
+        """Initialize the JWKS token validator."""
+        self.tenant_id = settings.azure_tenant_id
+        self.client_id = settings.azure_client_id
+        self.admin_group_id = settings.admin_group_id
+        self.jwks_cache = {}
+        self.jwks_cache_expiry = 0
+        
+        # Skip JWKS fetching if using placeholder values
+        if self.tenant_id == "your-tenant-id-here":
+            logger.warning("Using placeholder Entra ID configuration. JWKS validation will not work.")
+            self.enabled = False
+        else:
+            self.enabled = True
+    
+    async def verify_jwt_token(self, token: str) -> UserInfo:
+        """
+        Verify JWT token using JWKS and return UserInfo if valid.
+        
+        Args:
+            token: The JWT token to verify
+            
+        Returns:
+            UserInfo object if token is valid
+            
+        Raises:
+            HTTPException: If token is invalid or user is not admin
+        """
+        if not self.enabled:
+            # Development mode - create mock admin user
+            logger.warning("Development mode: Creating mock admin user")
+            log_token_validation(token, {"dev": True})
+            log_auth_attempt("dev@example.com", True, {"mode": "development"})
+            return UserInfo(
+                user_id="dev-user-ping",
+                name="Development User (Ping)",
+                email="dev-ping@example.com",
+                is_admin=True,
+                roles=["admin"]
+            )
+        
+        try:
+            log_token_validation(token, None, None)  # Log attempt
+            
+            # 1. Get Microsoft's public keys for signature verification
+            jwks = await self._get_microsoft_jwks()
+            
+            # 2. Decode JWT header to get key ID
+            unverified_header = jwt.get_unverified_header(token)
+            kid = unverified_header.get("kid")
+            
+            if not kid:
+                logger.warning("Token missing key ID (kid) in header")
+                log_token_validation(token, unverified_header, "Missing key ID (kid) in header")
+                raise HTTPException(status_code=401, detail="Invalid token format")
+            
+            # 3. Find the corresponding public key
+            public_key = None
+            for key in jwks.get("keys", []):
+                if key.get("kid") == kid:
+                    public_key = jwk.construct(key)
+                    break
+            
+            if not public_key:
+                logger.warning(f"No public key found for kid: {kid}")
+                log_token_validation(token, {"kid": kid}, f"No public key found for kid: {kid}")
+                raise HTTPException(status_code=401, detail="Token verification failed")
+            
+            # 4. Verify JWT signature and claims
+            payload = jwt.decode(
+                token,
+                public_key,
+                algorithms=["RS256"],
+                issuer=f"https://login.microsoftonline.com/{self.tenant_id}/v2.0",
+                audience=self.client_id
+            )
+            
+            # 5. Extract user information
+            user_id = payload.get("sub", "")
+            user_email = payload.get("email") or payload.get("upn", "")
+            user_name = payload.get("name", user_email.split("@")[0] if user_email else "Unknown")
+            
+            # 6. Check admin role/scope
+            is_admin = await self._check_admin_role(payload)
+            roles = self._extract_roles(payload)
+            
+            if not is_admin:
+                logger.warning(f"Non-admin user {user_email} attempted ping service access")
+                log_auth_attempt(user_email, False, {"type": "ping_service_access", "reason": "not_admin"})
+                log_token_validation(token, payload, "User does not have admin role")
+                raise HTTPException(status_code=403, detail="Admin role required")
+            
+            # 7. Return valid UserInfo
+            logger.info(f"Admin user {user_email} granted ping service access via JWKS validation")
+            log_auth_attempt(user_email, True, {"type": "ping_service_access", "admin": True, "method": "jwks"})
+            log_token_validation(token, payload)  # Success
+            
+            return UserInfo(
+                user_id=user_id,
+                name=user_name,
+                email=user_email,
+                is_admin=is_admin,
+                roles=roles
+            )
+            
+        except HTTPException:
+            raise
+        except JWTError as e:
+            logger.warning(f"JWT validation failed: {e}")
+            log_token_validation(token, None, f"JWT validation failed: {e}")
+            log_auth_attempt("unknown", False, {"type": "ping_service_access", "error": str(e)})
+            raise HTTPException(status_code=401, detail="Invalid token")
+        except Exception as e:
+            logger.error(f"Token verification error: {e}")
+            log_token_validation(token, None, f"Token verification error: {e}")
+            log_auth_attempt("unknown", False, {"type": "ping_service_access", "error": str(e)})
+            raise HTTPException(status_code=500, detail="Token verification failed")
+    
+    async def _get_microsoft_jwks(self) -> dict:
+        """Get Microsoft's JSON Web Key Set for token signature verification."""
+        current_time = time.time()
+        
+        # Use cached JWKS if still valid (cache for 1 hour)
+        if current_time < self.jwks_cache_expiry and self.jwks_cache:
+            return self.jwks_cache
+        
+        try:
+            jwks_url = f"https://login.microsoftonline.com/{self.tenant_id}/discovery/v2.0/keys"
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(jwks_url, timeout=10.0)
+                response.raise_for_status()
+                
+                jwks = response.json()
+                
+                # Cache JWKS for 1 hour
+                self.jwks_cache = jwks
+                self.jwks_cache_expiry = current_time + 3600
+                
+                logger.debug(f"Successfully fetched and cached Microsoft JWKS from {jwks_url}")
+                return jwks
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch Microsoft JWKS: {e}")
+            # Return cached JWKS if available, even if expired
+            return self.jwks_cache if self.jwks_cache else {"keys": []}
+    
+    async def _check_admin_role(self, payload: dict) -> bool:
+        """
+        Check if the user has admin role based on token claims.
+        
+        Args:
+            payload: JWT token payload
+            
+        Returns:
+            True if user has admin role, False otherwise
+        """
+        # Method 1: Check roles claim (App roles)
+        roles = payload.get("roles", [])
+        if "Admin" in roles or "admin" in roles or settings.admin_role_name in roles:
+            return True
+        
+        # Method 2: Check groups claim (Azure AD groups)
+        groups = payload.get("groups", [])
+        if self.admin_group_id and self.admin_group_id in groups:
+            return True
+        
+        # Method 3: Check scope claim (OAuth2 scopes)
+        scopes = payload.get("scp", "").split()
+        if "admin" in scopes or settings.required_scopes in scopes:
+            return True
+        
+        # Method 4: Check custom extension attributes
+        admin_extensions = [
+            "extension_admin",
+            "extension_is_admin", 
+            "extension_role_admin"
+        ]
+        for ext in admin_extensions:
+            if payload.get(ext) in ["true", "1", True]:
+                return True
+        
+        return False
+    
+    def _extract_roles(self, payload: dict) -> list[str]:
+        """Extract roles from JWT payload."""
+        roles = []
+        
+        # Add roles from roles claim
+        token_roles = payload.get("roles", [])
+        if isinstance(token_roles, list):
+            roles.extend(token_roles)
+        
+        # Add scope-based roles
+        scopes = payload.get("scp", "").split()
+        if "admin" in scopes:
+            roles.append("admin")
+        
+        return roles
+
+
+# Global JWKS validator instance
+jwks_validator = JWKSTokenValidator()
+
+
+async def verify_admin_token_jwks(request: Request) -> UserInfo:
+    """Verify JWT token using JWKS and check admin role for ping service."""
+    try:
+        # Extract JWT token from Authorization header
+        auth_header = request.headers.get("authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Bearer token required")
+        
+        jwt_token = auth_header.split(" ")[1]
+        
+        # Verify the token using JWKS validation and check admin role
+        user_info = await jwks_validator.verify_jwt_token(jwt_token)
+        logger.info(f"JWKS validation successful for user {user_info.email} in ping service")
+        
+        return user_info
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"JWKS validation error in ping service: {e}")
+        raise HTTPException(status_code=401, detail="Token validation failed")
 
 
 class A2AUserProxy(A2AUser):
@@ -68,6 +303,17 @@ class CustomCallContextBuilder:
                 user = A2AUserProxy(user_info)
             except HTTPException:
                 pass  # Invalid token, user remains None
+        
+        # If no valid user found, create an anonymous user for A2A compatibility
+        if user is None:
+            from shared.models import UserInfo
+            anonymous_user_info = UserInfo(
+                user_id="anonymous",
+                name="Anonymous User",
+                email="anonymous@example.com",
+                is_admin=False
+            )
+            user = A2AUserProxy(anonymous_user_info)
         
         return ServerCallContext(
             user=user,
@@ -160,11 +406,11 @@ async def auth_callback(request: Request, code: str = None, state: str = None, e
 @app.post("/ping")
 async def manual_ping(
     request: Request,
-    user_info: UserInfo = Depends(auth_middleware.require_admin)
+    user_info: UserInfo = Depends(verify_admin_token_jwks)
 ):
-    """Manual ping endpoint that sends a ping via A2A protocol to pong service (requires admin role)."""
+    """Manual ping endpoint that sends a ping via A2A protocol to pong service (requires admin role with JWKS validation)."""
     try:
-        logger.info(f"Manual ping request from {user_info.name}")
+        logger.info(f"Manual ping request from {user_info.name} (JWKS validated)")
         
         # Get auth token from request for forwarding
         auth_header = request.headers.get("authorization")
@@ -211,7 +457,7 @@ async def manual_ping(
             
             async with httpx.AsyncClient() as client:
                 pong_response = await client.post(
-                    f"{settings.pong_service_url}/pong/mcp",  # A2A endpoint root
+                    f"{settings.pong_service_url}/",  # A2A endpoint (root)
                     json=a2a_request,
                     headers=headers,
                     timeout=10.0

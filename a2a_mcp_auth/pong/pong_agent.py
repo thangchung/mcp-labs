@@ -1,20 +1,23 @@
 """Pong service A2A agent implementation."""
 
+import logging
 from a2a.types import (
     AgentCapabilities,
     AgentCard,
     AgentSkill,
     AuthorizationCodeOAuthFlow,
     OAuthFlows,
-    OAuth2SecurityScheme,
-    SecuritySchemeBase,
+    OAuth2SecurityScheme
 )
 
 from shared.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 def create_pong_agent_card() -> AgentCard:
     """Create the agent card for the Pong service."""
+    logger.info("[PONG] Creating Pong Agent Card - Function called during A2A setup")
     
     # Define OAuth2 security scheme for Microsoft Entra ID
     oauth2_scheme = OAuth2SecurityScheme(
@@ -22,8 +25,8 @@ def create_pong_agent_card() -> AgentCard:
         description="Microsoft Entra ID OAuth2 authentication",
         flows=OAuthFlows(
             authorization_code=AuthorizationCodeOAuthFlow(
-                authorizationUrl=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/authorize",
-                tokenUrl=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/token",
+                authorization_url=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/authorize",
+                token_url=f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/token",
                 scopes={
                     "openid": "OpenID Connect authentication",
                     "profile": "Access to user profile",
@@ -58,17 +61,18 @@ def create_pong_agent_card() -> AgentCard:
         description="A2A Pong service that responds to ping messages with Microsoft Entra ID authentication",
         url=settings.pong_service_url,
         version="1.0.0",
-        protocolVersion="0.3.0",
+        protocol_version="0.3.0",
         capabilities=capabilities,
         skills=[pong_skill],
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         security_schemes={
-            "oauth2": oauth2_scheme
+            "oauth2": oauth2_scheme  # type: ignore
         },
         security=[
             {"oauth2": ["openid", "profile", "email", settings.required_scopes]}
         ]
     )
     
+    logger.info(f"[PONG] Agent Card created successfully - Name: {agent_card.name}, URL: {agent_card.url}")
     return agent_card

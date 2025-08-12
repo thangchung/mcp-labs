@@ -52,8 +52,8 @@ class EntraIDTokenVerifier(TokenVerifier):
                 client_id="dev-client",
                 scopes=["admin"],
                 expires_at=int(time.time()) + 3600,
-                user_id="dev-user",
-                user_email="dev@example.com"
+                user_id="dev-user", # type: ignore
+                user_email="dev@example.com" # type: ignore
             )
         
         try:
@@ -114,8 +114,8 @@ class EntraIDTokenVerifier(TokenVerifier):
                 client_id=payload.get("azp", payload.get("appid", "")),
                 scopes=["admin"],
                 expires_at=payload.get("exp", 0),
-                user_id=user_id,
-                user_email=user_email
+                user_id=user_id, # type: ignore
+                user_email=user_email # type: ignore
             )
             
         except JWTError as e:

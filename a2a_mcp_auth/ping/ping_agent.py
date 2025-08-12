@@ -1,5 +1,6 @@
 """Ping service A2A agent implementation."""
 
+import logging
 from a2a.types import (
     AgentCapabilities,
     AgentCard,
@@ -11,9 +12,12 @@ from a2a.types import (
 
 from shared.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 def create_ping_agent_card() -> AgentCard:
     """Create the agent card for the Ping service."""
+    logger.info("[PING] Creating Ping Agent Card - Function called during A2A setup")
     
     # Define OAuth2 security scheme for Microsoft Entra ID
     oauth2_scheme = OAuth2SecurityScheme(
@@ -50,8 +54,8 @@ def create_ping_agent_card() -> AgentCard:
     # Create agent capabilities
     capabilities = AgentCapabilities(
         streaming=False,
-        supports_progress_updates=False,
-        supports_cancellation=False
+        # supports_progress_updates=False,
+        # supports_cancellation=False
     )
     
     # Create the agent card
@@ -66,11 +70,12 @@ def create_ping_agent_card() -> AgentCard:
         default_input_modes=["text"],
         default_output_modes=["text"],
         security_schemes={
-            "oauth2": oauth2_scheme
+            "oauth2": oauth2_scheme # type: ignore
         },
         security=[
             {"oauth2": ["openid", "profile", "email", settings.required_scopes]}
         ]
     )
     
+    logger.info(f"[PING] Agent Card created successfully - Name: {agent_card.name}, URL: {agent_card.url}")
     return agent_card

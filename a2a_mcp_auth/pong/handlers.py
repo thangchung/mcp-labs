@@ -13,6 +13,7 @@ from a2a.types import (
     TextPart,
 )
 
+from shared.config import settings
 from shared.models import PongMessage
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,11 @@ class PongHandler:
     def __init__(self) -> None:
         """Initialize the Pong handler."""
         self.service_name = "pong-service"
+        logger.info("[PONG HANDLER] Initialized - Ready to handle incoming A2A messages")
+        
+        # Import MCP client here to avoid circular imports
+        from .mcp_client import mcp_client
+        self.mcp_client = mcp_client
     
     async def on_message_send(
         self,
@@ -62,21 +68,59 @@ class PongHandler:
                 )
                 
                 # Start with basic pong response  
-                response_text = f"Pong! Received your A2A ping (ID: {params.message.message_id[:8]}...) at {datetime.utcnow().isoformat()}"
+                response_text = f"Pong! Received your A2A ping (ID: {params.message.message_id[:8]}...) at {datetime.now().isoformat()}"
                 
-                # If user has admin role and message requests MCP enhancement, try to enhance
-                if context.user.is_authenticated and "mcp enhancement" in message_content.lower():
+                # Check if user is authenticated and has admin privileges for MCP enhancement
+                user_is_admin = False
+                
+                if context.user and context.user.is_authenticated:
+                    # Check if user has admin privileges (using our A2AUserProxy structure)
+                    # Use getattr to safely access user_info attribute
+                    user_info = getattr(context.user, 'user_info', None)
+                    if user_info and hasattr(user_info, 'is_admin'):
+                        user_is_admin = user_info.is_admin
+                
+                if user_is_admin:
                     try:
-                        logger.info("Admin user requesting MCP enhancement in A2A flow")
-                        response_text += "\nMCP Enhancement: Requested but requires direct HTTP call with token"
-                        response_text += "\nNote: Use /pong/mcp endpoint for full MCP integration with authentication"
+                        logger.info("Admin user detected - attempting MCP enhancement with JWT token")
                         
+                        # Extract JWT token from user proxy if available (type: ignore for A2AUserProxy)
+                        auth_token = None
+                        if hasattr(context.user, 'jwt_token'):
+                            auth_token = getattr(context.user, 'jwt_token', None)  # type: ignore
+                            if auth_token:
+                                logger.debug("JWT token extracted from A2A user context for MCP call")
+                                logger.debug("Note: For enhanced security, direct /pong/mcp endpoint uses JWKS validation")
+                        
+                        # Call MCP with JWT token if available, otherwise fall back to service call
+                        mcp_response = await self.mcp_client.ping_mcp_service_call(
+                            message_content, 
+                            self.service_name,
+                            auth_token=auth_token
+                        )
+                        
+                        if mcp_response["status"] == "success":
+                            response_text += f"\n🚀 MCP Enhancement: {mcp_response['content']}"
+                            if "metadata" in mcp_response:
+                                response_text += f"\n📊 MCP Details: Service call from {mcp_response['metadata'].get('caller', 'unknown')}"
+                                if auth_token:
+                                    response_text += " (JWT token forwarded)"
+                        else:
+                            response_text += f"\n⚠️ MCP Enhancement: {mcp_response['content']}"
+                            
                     except Exception as e:
-                        logger.warning(f"MCP enhancement failed in A2A flow: {str(e)}")
-                        response_text += f"\nMCP Enhancement: Failed - {str(e)}"
+                        logger.error(f"MCP integration error: {str(e)}")
+                        response_text += f"\n❌ MCP Enhancement: Error - {str(e)}"
+                        
+                elif context.user and context.user.is_authenticated:
+                    response_text += "\n🔒 MCP Enhancement: Admin privileges required"
+                    response_text += "\n💡 Tip: Contact admin to upgrade your role for MCP access"
                 else:
-                    # Standard A2A pong without MCP enhancement
-                    response_text += "\n(Use 'mcp enhancement' in message for admin MCP integration info)"
+                    response_text += "\n🔐 MCP Enhancement: Authentication required"
+                    response_text += "\n💡 Tip: Use valid JWT token for authentication"
+                    
+                # Always provide guidance for full MCP integration
+                response_text += "\n🚀 For enhanced security: POST /pong/mcp with Authorization header (JWKS validation)"
                 
                 # Create A2A response message
                 response_message = Message(

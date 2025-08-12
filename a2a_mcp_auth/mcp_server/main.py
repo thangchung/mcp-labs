@@ -216,8 +216,10 @@ def setup_app():
     app = create_mcp_server()
     
     logger.info("MCP server ready to accept connections")
-    logger.info("Authentication: Bearer tokens with admin scope required")
+    logger.info("Security Policy: JWT Bearer tokens with admin scope required for ALL access")
+    logger.info("Authentication: Microsoft Entra ID (JWKS validation)")
     logger.info("Available tools: ping_processor")
+    logger.info("Service Access: JWT-only (no service-to-service fallback for enhanced security)")
     
     return app
 
