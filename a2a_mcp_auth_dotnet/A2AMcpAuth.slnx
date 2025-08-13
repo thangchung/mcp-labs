@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/McpServer/McpServer.csproj" />
+    <Project Path="src/PingService/PingService.csproj" />
+    <Project Path="src/PongService/PongService.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/A2AMcpAuth.Tests/A2AMcpAuth.Tests.csproj" />
+  </Folder>
+</Solution>
