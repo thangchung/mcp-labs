@@ -57,12 +57,14 @@ public class SecureApiController : ControllerBase
                 Claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList()
             };
 
-            _logger.LogInformation("User info requested by {UserId}", userInfo.UserId);
+            _logger.LogInformation("User info requested by {UserId} with email {Email} from tenant {TenantId}", 
+                userInfo.UserId, userInfo.Email, userInfo.TenantId);
             return Ok(userInfo);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving user information");
+            _logger.LogError(ex, "Error retrieving user information for user {UserId}", 
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "Unknown");
             return StatusCode(500, new { Error = "Failed to retrieve user information" });
         }
     }

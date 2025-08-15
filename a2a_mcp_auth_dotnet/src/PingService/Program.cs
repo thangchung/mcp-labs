@@ -5,9 +5,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Logging;
+using ServiceDefaults;
 using Microsoft.OpenApi.Models;
 using PingService.Agents;
 using PingService.Services;
+using PingService.Middleware;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace PingService;
@@ -18,6 +20,22 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        // Configure structured logging with JSON formatter
+        builder.Logging.ClearProviders();
+        builder.Logging.AddJsonConsole(options =>
+        {
+            options.IncludeScopes = true;
+            options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            options.UseUtcTimestamp = true;
+            options.JsonWriterOptions = new System.Text.Json.JsonWriterOptions
+            {
+                Indented = false
+            };
+        });
+
+        // Add OpenTelemetry logging
+        builder.AddObservabilityLogging("PingService");
+
         builder.WebHost.ConfigureKestrel(serverOptions =>
         {
             serverOptions.AddServerHeader = false;
@@ -26,10 +44,14 @@ public class Program
         var services = builder.Services;
         var configuration = builder.Configuration;
 
+        // Add observability (OpenTelemetry)
+        services.AddObservability("PingService", configuration, builder.Environment);
+
         // Add services to the container
         services.AddControllers();
         services.AddEndpointsApiExplorer();
         services.AddHttpContextAccessor();
+        services.AddServiceDefaults(configuration);
 
         // Configure Microsoft Identity Web API authentication
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -89,7 +111,7 @@ public class Program
                 Description = "A2A MCP Authentication Ping Service API - Client service that sends messages via A2A protocol"
             });
         });
-        
+
         // Register A2A Client service
         services.AddSingleton<IA2AClientService, A2AClientService>();
 
@@ -138,6 +160,9 @@ public class Program
         app.UseHttpsRedirection();
         app.UseRouting();
 
+        // Add JSON-RPC tracing middleware before authentication
+        app.UseMiddleware<JsonRpcTracingMiddleware>();
+
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -150,9 +175,7 @@ public class Program
         app.MapA2A(taskManager, "/ping");
         app.MapHttpA2A(taskManager, "/ping");
 
-        // Health check endpoint (allow anonymous access)
-        app.MapGet("/health", () => new { Status = "Healthy", Service = "PingService", Timestamp = DateTime.UtcNow })
-           .AllowAnonymous();
+        app.MapDefaultEndpoints("PingService");
 
         app.Run();
     }

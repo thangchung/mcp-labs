@@ -24,8 +24,8 @@
     <PackageReference Include="Moq" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="ModelContextProtocol" />
-    <PackageReference Include="A2A.AspNetCore" />
+  <PackageReference Include="ModelContextProtocol" />
+  <PackageReference Include="A2A.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>

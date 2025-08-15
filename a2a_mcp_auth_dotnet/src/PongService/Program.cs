@@ -5,9 +5,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Logging;
+using ServiceDefaults;
 using Microsoft.OpenApi.Models;
 using PongService.Agents;
 using PongService.Services;
+using PongService.Middleware;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace PongService;
@@ -18,6 +20,22 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        // Configure structured logging with JSON formatter
+        builder.Logging.ClearProviders();
+        builder.Logging.AddJsonConsole(options =>
+        {
+            options.IncludeScopes = true;
+            options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            options.UseUtcTimestamp = true;
+            options.JsonWriterOptions = new System.Text.Json.JsonWriterOptions
+            {
+                Indented = false
+            };
+        });
+
+        // Add OpenTelemetry logging
+        builder.AddObservabilityLogging("PongService");
+
         builder.WebHost.ConfigureKestrel(serverOptions =>
         {
             serverOptions.AddServerHeader = false;
@@ -26,10 +44,14 @@ public class Program
         var services = builder.Services;
         var configuration = builder.Configuration;
 
+        // Add observability (OpenTelemetry)
+        services.AddObservability("PongService", configuration, builder.Environment);
+
         // Add services to the container
         services.AddControllers();
         services.AddEndpointsApiExplorer();
         services.AddHttpContextAccessor();
+        services.AddServiceDefaults(configuration);
 
         // Configure Microsoft Identity Web API authentication
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -105,7 +127,7 @@ public class Program
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
             var httpClient = httpClientFactory.CreateClient(nameof(McpClientService));
-            
+
             return new McpClientService(config, logger, loggerFactory, httpClient);
         });
 
@@ -154,6 +176,9 @@ public class Program
         app.UseHttpsRedirection();
         app.UseRouting();
 
+        // Add JSON-RPC tracing middleware before authentication
+        app.UseMiddleware<JsonRpcTracingMiddleware>();
+
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -166,9 +191,7 @@ public class Program
         app.MapA2A(taskManager, "/pong");
         app.MapHttpA2A(taskManager, "/pong");
 
-        // Health check endpoint (allow anonymous access)
-        app.MapGet("/health", () => new { Status = "Healthy", Service = "PongService", Timestamp = DateTime.UtcNow })
-           .AllowAnonymous();
+        app.MapDefaultEndpoints("PongService");
 
         app.Run();
     }

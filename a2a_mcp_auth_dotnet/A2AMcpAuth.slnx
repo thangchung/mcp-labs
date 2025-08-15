@@ -1,8 +1,14 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/McpServer/McpServer.csproj" />
     <Project Path="src/PingService/PingService.csproj" />
     <Project Path="src/PongService/PongService.csproj" />
+  <Project Path="src/ServiceDefaults/ServiceDefaults.csproj" />
+  <Project Path="src/AppHost/AppHost.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/A2AMcpAuth.Tests/A2AMcpAuth.Tests.csproj" />

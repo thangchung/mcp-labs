@@ -21,7 +21,8 @@ public class A2AClientService : IA2AClientService
     {
         try
         {
-            _logger.LogInformation("Initiating A2A protocol communication for user: {UserEmail}", userEmail);
+            _logger.LogInformation("Initiating A2A protocol communication for user: {UserEmail} to service: {PongServiceUrl}", 
+                userEmail, _pongServiceUrl);
 
             // Create HTTP client with proper authentication headers
             using var httpClient = new HttpClient();
@@ -30,6 +31,8 @@ public class A2AClientService : IA2AClientService
 
             // Create A2A client with authenticated HTTP client
             var a2aClient = new A2AClient(new Uri($"{_pongServiceUrl}/pong"), httpClient);
+
+            _logger.LogDebug("Created A2A client for endpoint: {Endpoint}", $"{_pongServiceUrl}/pong");
 
             // Create A2A message with minimal metadata (authentication is in HTTP headers now)
             var a2aMessage = new Message
@@ -64,7 +67,8 @@ public class A2AClientService : IA2AClientService
 
             if (response is AgentTask task)
             {
-                _logger.LogInformation("Received A2A task response with ID: {TaskId}", task.Id);
+                _logger.LogInformation("A2A task created successfully with ID: {TaskId}, Status: {TaskStatus}", 
+                    task.Id, task.Status.State.ToString());
 
                 return new A2AServiceResponse
                 {

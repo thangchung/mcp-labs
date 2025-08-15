@@ -1,8 +1,6 @@
 using A2A;
 using PingService.Services;
 using System.Diagnostics;
-using System.Text.Json;
-using System.Security.Claims;
 
 namespace PingService.Agents;
 
